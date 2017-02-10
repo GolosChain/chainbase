@@ -17,6 +17,8 @@ list(APPEND BOOST_COMPONENTS thread
 
 option(Boost_USE_STATIC_LIBS "Build with Boost static libraries usage" TRUE)
 
+option(BUILD_SHARED_LIBRARIES "Build shared libraries" TRUE)
+
 if(WIN32)
     set(BOOST_ROOT $ENV{BOOST_ROOT})
     set(Boost_USE_MULTITHREADED ON)
@@ -62,7 +64,15 @@ endif()
 
 
 file(GLOB HEADERS "include/*.hpp")
-add_library(chainbase src/chainbase.cpp ${HEADERS})
+if(BUILD_SHARED_LIBRARIES)
+    add_library(chainbase SHARED
+            src/chainbase.cpp
+            ${HEADERS})
+else()
+    add_library(chainbase STATIC
+            src/chainbase.cpp
+            ${HEADERS})
+endif()
 target_link_libraries(chainbase ${Boost_LIBRARIES})
 target_include_directories(chainbase PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" ${Boost_INCLUDE_DIR})
 
