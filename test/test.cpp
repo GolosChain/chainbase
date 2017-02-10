@@ -1,6 +1,11 @@
+#ifdef BOOST_TEST_DYN_LINK
 #define BOOST_TEST_MODULE chainbase test
-
 #include <boost/test/unit_test.hpp>
+#else
+#define BOOST_TEST_MAIN
+#include <boost/test/included/unit_test.hpp>
+#endif
+
 #include <chainbase/chainbase.hpp>
 
 #include <boost/multi_index_container.hpp>
