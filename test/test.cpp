@@ -1,5 +1,5 @@
 #ifdef BOOST_TEST_DYN_LINK
-#define BOOST_TEST_MODULE chainbase test
+#define BOOST_TEST_MODULE chainbase_test
 #include <boost/test/unit_test.hpp>
 #else
 #define BOOST_TEST_MAIN
