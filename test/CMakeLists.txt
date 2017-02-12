@@ -1,6 +1,6 @@
 file(GLOB UNIT_TESTS "*.cpp")
 
-if(Boost_USE_STATIC_LIBS)
+if (NOT Boost_USE_STATIC_LIBS)
     add_definitions(-DBOOST_TEST_DYN_LINK)
 endif()
 
