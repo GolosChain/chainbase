@@ -66,12 +66,14 @@ endif()
 file(GLOB HEADERS "include/*.hpp")
 if(BUILD_SHARED_LIBRARIES)
     add_library(chainbase SHARED
+            include/chainbase/chainbase.hpp
             src/chainbase.cpp
-            ${HEADERS})
+            )
 else()
     add_library(chainbase STATIC
+            include/chainbase/chainbase.hpp
             src/chainbase.cpp
-            ${HEADERS})
+            )
 endif()
 target_link_libraries(chainbase ${Boost_LIBRARIES})
 target_include_directories(chainbase PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" ${Boost_INCLUDE_DIR})

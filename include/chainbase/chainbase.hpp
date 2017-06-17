@@ -185,6 +185,9 @@ namespace chainbase {
         int32_t &_target;
     };
 
+    template<typename MultiIndexType>
+    class secondary_index;
+
     /**
      *  The value_type stored in the multiindex container must have a integer field with the name 'id'.  This will
      *  be the primary key and it will be assigned and managed by generic_index.
@@ -233,18 +236,35 @@ namespace chainbase {
 
             ++_next_id;
             on_create(*insert_result.first);
+
+            for (const auto &item : _sindex) {
+                item->object_inserted(*insert_result.first);
+            }
+
             return *insert_result.first;
         }
 
         template<typename Modifier>
         void modify(const value_type &obj, Modifier &&m) {
+            for (const auto &item : _sindex) {
+                item->about_to_modify(obj);
+            }
+
             on_modify(obj);
+
             auto ok = _indices.modify(_indices.iterator_to(obj), m);
             if (!ok)
                 BOOST_THROW_EXCEPTION(std::logic_error("Could not modify object, most likely a uniqueness constraint was violated"));
+
+            for (const auto &item : _sindex) {
+                item->object_modified(obj);
+            }
         }
 
         void remove(const value_type &obj) {
+            for (const auto &item : _sindex) {
+                item->object_removed(obj);
+            }
             on_remove(obj);
             _indices.erase(_indices.iterator_to(obj));
         }
@@ -528,6 +548,23 @@ namespace chainbase {
             remove(*val);
         }
 
+        template<typename T>
+        T *add_secondary_index() {
+            _sindex.emplace_back(new T());
+            return static_cast<T *>(_sindex.back().get());
+        }
+
+        template<typename T>
+        const T &get_secondary_index() const {
+            for (const auto &item : _sindex) {
+                const T *result = dynamic_cast<const T *>(item.get());
+                if (result != nullptr) {
+                    return *result;
+                }
+            }
+            BOOST_THROW_EXCEPTION(std::logic_error("invalid index type"));
+        }
+
     private:
         bool enabled() const {
             return _stack.size();
@@ -594,11 +631,39 @@ namespace chainbase {
          *
          *  Commit will discard all revisions prior to the committed revision.
          */
+
         int64_t _revision = 0;
         typename value_type::id_type _next_id = 0;
         index_type _indices;
         uint32_t _size_of_value_type = 0;
         uint32_t _size_of_this = 0;
+
+        std::vector<std::unique_ptr<secondary_index<MultiIndexType>>> _sindex;
+    };
+
+    template<typename MultiIndexType>
+    class secondary_index {
+    public:
+
+        typedef bip::managed_mapped_file::segment_manager segment_manager_type;
+        typedef MultiIndexType index_type;
+        typedef typename index_type::value_type value_type;
+        typedef bip::allocator<generic_index<MultiIndexType>, segment_manager_type> allocator_type;
+
+        virtual ~secondary_index() {
+        };
+
+        virtual void object_inserted(const value_type &obj) {
+        };
+
+        virtual void object_removed(const value_type &obj) {
+        };
+
+        virtual void about_to_modify(const value_type &before) {
+        };
+
+        virtual void object_modified(const value_type &after) {
+        };
     };
 
     class abstract_session {
@@ -779,19 +844,23 @@ namespace chainbase {
         void set_require_locking(bool enable_require_locking);
 
 #ifdef CHAINBASE_CHECK_LOCKING
-        void require_lock_fail( const char* method, const char* lock_type, const char* tname )const;
 
-        void require_read_lock( const char* method, const char* tname )const
-        {
-           if( BOOST_UNLIKELY( _enable_require_locking & _read_only & (_read_lock_count <= 0) ) )
-              require_lock_fail(method, "read", tname);
+        void require_lock_fail(const char *method, const char *lock_type, const char *tname) const;
+
+        void require_read_lock(const char *method, const char *tname) const {
+            if (BOOST_UNLIKELY(_enable_require_locking & _read_only &
+                               (_read_lock_count <= 0))) {
+                require_lock_fail(method, "read", tname);
+            }
         }
 
-        void require_write_lock( const char* method, const char* tname )
-        {
-           if( BOOST_UNLIKELY( _enable_require_locking & (_write_lock_count <= 0) ) )
-              require_lock_fail(method, "write", tname);
+        void require_write_lock(const char *method, const char *tname) {
+            if (BOOST_UNLIKELY(
+                        _enable_require_locking & (_write_lock_count <= 0))) {
+                require_lock_fail(method, "write", tname);
+            }
         }
+
 #endif
 
         struct session {
@@ -1011,11 +1080,14 @@ namespace chainbase {
         }
 
         template<typename Lambda>
-        auto with_read_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(Lambda *)nullptr)()) {
+        auto with_read_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(
+                Lambda * )
+
+        nullptr)()) {
             read_lock lock(_rw_manager->current_lock(), bip::defer_lock_type());
 #ifdef CHAINBASE_CHECK_LOCKING
             BOOST_ATTRIBUTE_UNUSED
-            int_incrementer ii( _read_lock_count );
+            int_incrementer ii(_read_lock_count);
 #endif
 
             if (!wait_micro) {
@@ -1032,14 +1104,17 @@ namespace chainbase {
         }
 
         template<typename Lambda>
-        auto with_write_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(Lambda *)nullptr)()) {
+        auto with_write_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(
+                Lambda * )
+
+        nullptr)()) {
             if (_read_only)
                 BOOST_THROW_EXCEPTION(std::logic_error("cannot acquire write lock on read-only process"));
 
             write_lock lock(_rw_manager->current_lock(), boost::defer_lock_t());
 #ifdef CHAINBASE_CHECK_LOCKING
             BOOST_ATTRIBUTE_UNUSED
-            int_incrementer ii( _write_lock_count );
+            int_incrementer ii(_write_lock_count);
 #endif
 
             if (!wait_micro) {
