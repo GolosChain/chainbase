@@ -943,7 +943,7 @@ namespace chainbase {
 
 
         template<typename MultiIndexType>
-        index<generic_index<MultiIndexType>> *add_index() {
+        generic_index<MultiIndexType> *add_index() {
             const uint16_t type_id = generic_index<MultiIndexType>::value_type::type_id;
             typedef generic_index <MultiIndexType> index_type;
             typedef typename index_type::allocator_type index_alloc;
@@ -977,7 +977,7 @@ namespace chainbase {
             _index_map[type_id].reset(new_index);
             _index_list.push_back(new_index);
 
-            return new_index;
+            return idx_ptr;
         }
 
         auto get_segment_manager() -> decltype(((bip::managed_mapped_file *)nullptr)->get_segment_manager()) {
