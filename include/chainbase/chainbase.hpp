@@ -286,6 +286,12 @@ namespace chainbase {
             return *ptr;
         }
 
+        void inspect_objects(std::function<void(const value_type &)> inspector) const {
+            for (const auto &ptr : _indices) {
+                inspector(ptr);
+            }
+        }
+
         const index_type &indices() const {
             return _indices;
         }
