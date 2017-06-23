@@ -114,9 +114,10 @@ namespace chainbase {
 
     template<uint16_t TypeNumber, typename Derived>
     struct object {
+        typedef uint16_t type_number_type;
+
         typedef oid<Derived> id_type;
         static const uint16_t type_id = TypeNumber;
-
     };
 
     /** this class is ment to be specified to enable lookup of index type by object type using
