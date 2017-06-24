@@ -111,11 +111,24 @@ namespace chainbase {
         int64_t _id = 0;
     };
 
-    template<uint16_t TypeNumber, typename Derived>
+    /**
+     * Database primitive object
+     * @tparam TypeNumber TypeNumber must be unique for each object
+     * @tparam Derived Stored object type
+     * @tparam VersionNumber Stored object version number
+     *
+     * Typical type_id space usage for 0xDEADBEEF for little-endian systems is:
+     * 0xEF - Unused
+     * 0xBE - Objects version identifier
+     * 0xAD - Objects space identifier. For example plugins need to define object type IDs such that they do not conflict globally. If each plugin uses the upper 8 bits as a space identifier, with 0 being for chain, then the lower 8 bits are free for each plugin to define as they see fit. @file tags_plugin.hpp:41
+     * 0xDE - Object identifier.
+     */
+
+    template<uint32_t TypeNumber, typename Derived, uint32_t VersionNumber = 1>
     struct object {
         typedef oid<Derived> id_type;
-        static const uint16_t type_id = TypeNumber;
-
+        static const uint32_t type_id = VersionNumber - 1 ? VersionNumber << 16 + TypeNumber : TypeNumber;
+        static const uint32_t version_number = VersionNumber;
     };
 
     /** this class is ment to be specified to enable lookup of index type by object type using
