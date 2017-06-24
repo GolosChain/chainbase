@@ -127,7 +127,8 @@ namespace chainbase {
     template<uint32_t TypeNumber, typename Derived, uint32_t VersionNumber = 1>
     struct object {
         typedef oid<Derived> id_type;
-        static const uint32_t type_id = VersionNumber - 1 ? VersionNumber << 16 + TypeNumber : TypeNumber;
+
+        static const uint32_t type_id = VersionNumber - 1 ? (VersionNumber << 16) + TypeNumber : TypeNumber;
         static const uint32_t version_number = VersionNumber;
     };
 
