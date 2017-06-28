@@ -13,6 +13,7 @@
 
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/hashed_index.hpp>
+#include <boost/multi_index/key_extractors.hpp>
 
 #include <boost/chrono.hpp>
 #include <boost/config.hpp>
