@@ -84,29 +84,29 @@ namespace chainbase {
      *  Object ID type that includes the type of the object it references
      */
     template<typename T>
-    class oid {
+    class object_id {
     public:
-        oid(int64_t i = 0) : _id(i) {
+        object_id(int64_t i = 0) : _id(i) {
         }
 
-        oid &operator++() {
+        object_id &operator++() {
             ++_id;
             return *this;
         }
 
-        friend bool operator<(const oid &a, const oid &b) {
+        friend bool operator<(const object_id &a, const object_id &b) {
             return a._id < b._id;
         }
 
-        friend bool operator>(const oid &a, const oid &b) {
+        friend bool operator>(const object_id &a, const object_id &b) {
             return a._id > b._id;
         }
 
-        friend bool operator==(const oid &a, const oid &b) {
+        friend bool operator==(const object_id &a, const object_id &b) {
             return a._id == b._id;
         }
 
-        friend bool operator!=(const oid &a, const oid &b) {
+        friend bool operator!=(const object_id &a, const object_id &b) {
             return a._id != b._id;
         }
 
@@ -131,7 +131,7 @@ namespace chainbase {
     public:
         typedef uint16_t type_number_type;
 
-        typedef oid<Derived> id_type;
+        typedef object_id<Derived> id_type;
 
         static const uint32_t type_id = VersionNumber - 1 ? (VersionNumber << 16) + TypeNumber : TypeNumber;
         static const uint32_t version_number = VersionNumber;
@@ -1056,7 +1056,7 @@ namespace chainbase {
         }
 
         template<typename ObjectType>
-        const ObjectType *find(oid<ObjectType> key = oid<ObjectType>()) const {
+        const ObjectType *find(object_id<ObjectType> key = object_id<ObjectType>()) const {
             CHAINBASE_REQUIRE_READ_LOCK("find", ObjectType);
             typedef typename get_index_type<ObjectType>::type index_type;
             const auto &idx = get_index<index_type>().indices();
@@ -1077,7 +1077,7 @@ namespace chainbase {
         }
 
         template<typename ObjectType>
-        const ObjectType &get(const oid<ObjectType> &key = oid<ObjectType>()) const {
+        const ObjectType &get(const object_id<ObjectType> &key = object_id<ObjectType>()) const {
             CHAINBASE_REQUIRE_READ_LOCK("get", ObjectType);
             auto obj = find<ObjectType>(key);
             if (!obj)
@@ -1107,10 +1107,7 @@ namespace chainbase {
         }
 
         template<typename Lambda>
-        auto with_read_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(
-                Lambda * )
-
-        nullptr)()) {
+        auto with_read_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(Lambda * )nullptr)()) {
             read_lock lock(_rw_manager->current_lock(), bip::defer_lock_type());
 #ifdef CHAINBASE_CHECK_LOCKING
             BOOST_ATTRIBUTE_UNUSED
@@ -1131,10 +1128,7 @@ namespace chainbase {
         }
 
         template<typename Lambda>
-        auto with_write_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(
-                Lambda * )
-
-        nullptr)()) {
+        auto with_write_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(Lambda * )nullptr)()) {
             if (_read_only)
                 BOOST_THROW_EXCEPTION(std::logic_error("cannot acquire write lock on read-only process"));
 
