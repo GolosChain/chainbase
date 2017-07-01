@@ -12,6 +12,8 @@
 #include <boost/interprocess/sync/file_lock.hpp>
 
 #include <boost/multi_index_container.hpp>
+#include <boost/multi_index/ranked_index.hpp>
+#include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/key_extractors.hpp>
 
@@ -133,7 +135,9 @@ namespace chainbase {
 
         typedef object_id<Derived> id_type;
 
-        static const uint32_t type_id = VersionNumber - 1 ? (VersionNumber << 16) + TypeNumber : TypeNumber;
+        static const uint32_t type_id =
+                VersionNumber - 1 ? (VersionNumber << 16) + TypeNumber
+                                  : TypeNumber;
         static const uint32_t version_number = VersionNumber;
     };
 
@@ -1107,7 +1111,10 @@ namespace chainbase {
         }
 
         template<typename Lambda>
-        auto with_read_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(Lambda * )nullptr)()) {
+        auto with_read_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(
+                Lambda * )
+
+        nullptr)()) {
             read_lock lock(_rw_manager->current_lock(), bip::defer_lock_type());
 #ifdef CHAINBASE_CHECK_LOCKING
             BOOST_ATTRIBUTE_UNUSED
@@ -1128,7 +1135,10 @@ namespace chainbase {
         }
 
         template<typename Lambda>
-        auto with_write_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(Lambda * )nullptr)()) {
+        auto with_write_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(
+                Lambda * )
+
+        nullptr)()) {
             if (_read_only)
                 BOOST_THROW_EXCEPTION(std::logic_error("cannot acquire write lock on read-only process"));
 
