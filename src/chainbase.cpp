@@ -32,38 +32,38 @@ namespace chainbase {
         bool windows = false;
     };
 
-    void database::open(const bfs::path &dir, uint32_t flags, uint64_t shared_file_size) {
+    void database::open(const boost::filesystem::path &dir, uint32_t flags, uint64_t shared_file_size) {
 
         bool write = flags & database::read_write;
 
-        if (!bfs::exists(dir)) {
+        if (!boost::filesystem::exists(dir)) {
             if (!write)
                 BOOST_THROW_EXCEPTION(std::runtime_error(
                         "database file not found at " + dir.native()));
         }
 
-        bfs::create_directories(dir);
+        boost::filesystem::create_directories(dir);
         if (_data_dir != dir) {
             close();
         }
 
         _data_dir = dir;
-        auto abs_path = bfs::absolute(dir / "shared_memory.bin");
+        auto abs_path = boost::filesystem::absolute(dir / "shared_memory.bin");
 
-        if (bfs::exists(abs_path)) {
+        if (boost::filesystem::exists(abs_path)) {
             if (write) {
-                auto existing_file_size = bfs::file_size(abs_path);
+                auto existing_file_size = boost::filesystem::file_size(abs_path);
                 if (shared_file_size > existing_file_size) {
-                    if (!bip::managed_mapped_file::grow(abs_path.generic_string().c_str(),
+                    if (!boost::interprocess::managed_mapped_file::grow(abs_path.generic_string().c_str(),
                             shared_file_size - existing_file_size))
                         BOOST_THROW_EXCEPTION(std::runtime_error("could not grow database file to requested size."));
                 }
 
-                _segment.reset(new bip::managed_mapped_file(bip::open_only,
+                _segment.reset(new boost::interprocess::managed_mapped_file(boost::interprocess::open_only,
                         abs_path.generic_string().c_str()
                 ));
             } else {
-                _segment.reset(new bip::managed_mapped_file(bip::open_read_only,
+                _segment.reset(new boost::interprocess::managed_mapped_file(boost::interprocess::open_read_only,
                         abs_path.generic_string().c_str()
                 ));
                 _read_only = true;
@@ -74,24 +74,24 @@ namespace chainbase {
                 BOOST_THROW_EXCEPTION(std::runtime_error("database created by a different compiler, build, or operating system"));
             }
         } else {
-            _segment.reset(new bip::managed_mapped_file(bip::create_only,
+            _segment.reset(new boost::interprocess::managed_mapped_file(boost::interprocess::create_only,
                     abs_path.generic_string().c_str(), shared_file_size
             ));
             _segment->find_or_construct<environment_check>("environment")();
         }
 
 
-        abs_path = bfs::absolute(dir / "shared_memory.meta");
+        abs_path = boost::filesystem::absolute(dir / "shared_memory.meta");
 
-        if (bfs::exists(abs_path)) {
-            _meta.reset(new bip::managed_mapped_file(bip::open_only, abs_path.generic_string().c_str()
+        if (boost::filesystem::exists(abs_path)) {
+            _meta.reset(new boost::interprocess::managed_mapped_file(boost::interprocess::open_only, abs_path.generic_string().c_str()
             ));
 
             _rw_manager = _meta->find<read_write_mutex_manager>("rw_manager").first;
             if (!_rw_manager)
                 BOOST_THROW_EXCEPTION(std::runtime_error("could not find read write lock manager"));
         } else {
-            _meta.reset(new bip::managed_mapped_file(bip::create_only,
+            _meta.reset(new boost::interprocess::managed_mapped_file(boost::interprocess::create_only,
                     abs_path.generic_string().c_str(),
                     sizeof(read_write_mutex_manager) * 2
             ));
@@ -100,7 +100,7 @@ namespace chainbase {
         }
 
         if (write) {
-            _flock = bip::file_lock(abs_path.generic_string().c_str());
+            _flock = boost::interprocess::file_lock(abs_path.generic_string().c_str());
             if (!_flock.try_lock())
                 BOOST_THROW_EXCEPTION(std::runtime_error("could not gain write access to the shared memory file"));
         }
@@ -118,15 +118,15 @@ namespace chainbase {
     void database::close() {
         _segment.reset();
         _meta.reset();
-        _data_dir = bfs::path();
+        _data_dir = boost::filesystem::path();
     }
 
-    void database::wipe(const bfs::path &dir) {
+    void database::wipe(const boost::filesystem::path &dir) {
         _segment.reset();
         _meta.reset();
-        bfs::remove_all(dir / "shared_memory.bin");
-        bfs::remove_all(dir / "shared_memory.meta");
-        _data_dir = bfs::path();
+        boost::filesystem::remove_all(dir / "shared_memory.bin");
+        boost::filesystem::remove_all(dir / "shared_memory.meta");
+        _data_dir = boost::filesystem::path();
         _index_list.clear();
         _index_map.clear();
     }
@@ -138,12 +138,15 @@ namespace chainbase {
     }
 
 #ifdef CHAINBASE_CHECK_LOCKING
-    void database::require_lock_fail( const char* method, const char* lock_type, const char* tname )const
-    {
-       std::string err_msg = "database::" + std::string( method ) + " require_" + std::string( lock_type ) + "_lock() failed on type " + std::string( tname );
-       std::cerr << err_msg << std::endl;
-       BOOST_THROW_EXCEPTION( std::runtime_error( err_msg ) );
+
+    void database::require_lock_fail(const char *method, const char *lock_type, const char *tname) const {
+        std::string err_msg =
+                "database::" + std::string(method) + " require_" + std::string(lock_type) + "_lock() failed on type " +
+                std::string(tname);
+        std::cerr << err_msg << std::endl;
+        BOOST_THROW_EXCEPTION(std::runtime_error( err_msg ));
     }
+
 #endif
 
     void database::undo() {
@@ -172,7 +175,7 @@ namespace chainbase {
 
     database::session database::start_undo_session(bool enabled) {
         if (enabled) {
-            vector<std::unique_ptr<abstract_session>> _sub_sessions;
+            std::vector<boost::interprocess::unique_ptr<abstract_session>> _sub_sessions;
             _sub_sessions.reserve(_index_list.size());
             for (auto &item : _index_list) {
                 _sub_sessions.push_back(item->start_undo_session(enabled));

@@ -6,6 +6,10 @@
 #include <boost/interprocess/containers/flat_map.hpp>
 #include <boost/interprocess/containers/deque.hpp>
 #include <boost/interprocess/containers/string.hpp>
+#include <boost/interprocess/containers/vector.hpp>
+#include <boost/interprocess/smart_ptr/shared_ptr.hpp>
+#include <boost/interprocess/smart_ptr/unique_ptr.hpp>
+#include <boost/smart_ptr/make_shared.hpp>
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/sync/interprocess_sharable_mutex.hpp>
 #include <boost/interprocess/sync/sharable_lock.hpp>
@@ -45,15 +49,10 @@
 
 namespace chainbase {
 
-    namespace bip = boost::interprocess;
-    namespace bfs = boost::filesystem;
-    using std::unique_ptr;
-    using std::vector;
-
     template<typename T>
-    using allocator = bip::allocator<T, bip::managed_mapped_file::segment_manager>;
+    using allocator = boost::interprocess::allocator<T, boost::interprocess::managed_mapped_file::segment_manager>;
 
-    typedef bip::basic_string<char, std::char_traits<char>, allocator<char>> shared_string;
+    typedef boost::interprocess::basic_string<char, std::char_traits<char>, allocator<char>> shared_string;
 
     template<typename T>
     using shared_vector = std::vector<T, allocator<T>>;
@@ -208,7 +207,29 @@ namespace chainbase {
     };
 
     template<typename MultiIndexType>
-    class secondary_index;
+    class secondary_index {
+    public:
+        typedef boost::interprocess::managed_mapped_file::segment_manager segment_manager_type;
+        typedef MultiIndexType index_type;
+        typedef typename index_type::value_type value_type;
+        typedef boost::interprocess::allocator<secondary_index<MultiIndexType>, segment_manager_type> allocator_type;
+        typedef boost::interprocess::deleter<secondary_index<MultiIndexType>, segment_manager_type> deleter_type;
+
+        virtual ~secondary_index() {
+        };
+
+        virtual void object_inserted(const value_type &obj) {
+        };
+
+        virtual void object_removed(const value_type &obj) {
+        };
+
+        virtual void about_to_modify(const value_type &before) {
+        };
+
+        virtual void object_modified(const value_type &after) {
+        };
+    };
 
     /**
      *  The value_type stored in the multiindex container must have a integer field with the name 'id'.  This will
@@ -219,16 +240,17 @@ namespace chainbase {
     template<typename MultiIndexType>
     class generic_index {
     public:
-        typedef bip::managed_mapped_file::segment_manager segment_manager_type;
+        typedef boost::interprocess::managed_mapped_file::segment_manager segment_manager_type;
         typedef MultiIndexType index_type;
         typedef typename index_type::value_type value_type;
-        typedef bip::allocator<generic_index, segment_manager_type> allocator_type;
+        typedef boost::interprocess::allocator<generic_index, segment_manager_type> allocator_type;
+        typedef boost::interprocess::deleter<generic_index, segment_manager_type> deleter_type;
         typedef undo_state<value_type> undo_state_type;
 
         generic_index(allocator<value_type> a)
                 : _stack(a), _indices(a),
                   _size_of_value_type(sizeof(typename MultiIndexType::node_type)),
-                  _size_of_this(sizeof(*this)) {
+                  _size_of_this(sizeof(*this)), _sindex(a) {
         }
 
         void validate() const {
@@ -577,9 +599,24 @@ namespace chainbase {
         }
 
         template<typename T>
-        T *add_secondary_index() {
-            _sindex.emplace_back(new T());
-            return static_cast<T *>(_sindex.back().get());
+        typename boost::interprocess::vector<
+                boost::interprocess::shared_ptr<
+                        secondary_index<typename T::index_type>,
+                        typename secondary_index<typename T::index_type>::allocator_type,
+                        typename secondary_index<typename T::index_type>::deleter_type
+                >, allocator<
+                        boost::interprocess::shared_ptr<
+                                secondary_index<typename T::index_type>,
+                                typename secondary_index<typename T::index_type>::allocator_type,
+                                typename secondary_index<typename T::index_type>::deleter_type
+                        >
+                >
+        >::reference add_secondary_index() {
+            segment_manager_type *seg_m = _sindex.get_allocator().get_segment_manager();
+            _sindex.emplace_back(new secondary_index<typename T::index_type>(),
+                    typename secondary_index<typename T::index_type>::allocator_type(seg_m),
+                    typename secondary_index<typename T::index_type>::deleter_type(seg_m));
+            return _sindex.back();
         }
 
         template<typename T>
@@ -666,32 +703,19 @@ namespace chainbase {
         uint32_t _size_of_value_type = 0;
         uint32_t _size_of_this = 0;
 
-        std::vector<std::unique_ptr<secondary_index<MultiIndexType>>> _sindex;
-    };
-
-    template<typename MultiIndexType>
-    class secondary_index {
-    public:
-
-        typedef bip::managed_mapped_file::segment_manager segment_manager_type;
-        typedef MultiIndexType index_type;
-        typedef typename index_type::value_type value_type;
-        typedef bip::allocator<generic_index<MultiIndexType>, segment_manager_type> allocator_type;
-
-        virtual ~secondary_index() {
-        };
-
-        virtual void object_inserted(const value_type &obj) {
-        };
-
-        virtual void object_removed(const value_type &obj) {
-        };
-
-        virtual void about_to_modify(const value_type &before) {
-        };
-
-        virtual void object_modified(const value_type &after) {
-        };
+        boost::interprocess::vector<
+                boost::interprocess::shared_ptr<
+                        secondary_index<MultiIndexType>,
+                        typename secondary_index<MultiIndexType>::allocator_type,
+                        typename secondary_index<MultiIndexType>::deleter_type
+                >, allocator<
+                        boost::interprocess::shared_ptr<
+                                secondary_index<MultiIndexType>,
+                                typename secondary_index<MultiIndexType>::allocator_type,
+                                typename secondary_index<MultiIndexType>::deleter_type
+                        >
+                >
+        > _sindex;
     };
 
     class abstract_session {
@@ -744,7 +768,7 @@ namespace chainbase {
 
         virtual void set_revision(uint64_t revision) = 0;
 
-        virtual unique_ptr<abstract_session> start_undo_session(bool enabled) = 0;
+        virtual boost::interprocess::unique_ptr<abstract_session> start_undo_session(bool enabled) = 0;
 
         virtual int64_t revision() const = 0;
 
@@ -774,8 +798,8 @@ namespace chainbase {
         index_impl(BaseIndex &base) : abstract_index(&base), _base(base) {
         }
 
-        virtual unique_ptr<abstract_session> start_undo_session(bool enabled) override {
-            return unique_ptr<abstract_session>(new session_impl<typename BaseIndex::session>(_base.start_undo_session(enabled)));
+        virtual boost::interprocess::unique_ptr<abstract_session> start_undo_session(bool enabled) override {
+            return boost::interprocess::unique_ptr<abstract_session>(new session_impl<typename BaseIndex::session>(_base.start_undo_session(enabled)));
         }
 
         virtual void set_revision(uint64_t revision) override {
@@ -861,13 +885,13 @@ namespace chainbase {
             read_write = 1
         };
 
-        void open(const bfs::path &dir, uint32_t write = read_only, uint64_t shared_file_size = 0);
+        void open(const boost::filesystem::path &dir, uint32_t write = read_only, uint64_t shared_file_size = 0);
 
         void close();
 
         void flush();
 
-        void wipe(const bfs::path &dir);
+        void wipe(const boost::filesystem::path &dir);
 
         void set_require_locking(bool enable_require_locking);
 
@@ -898,7 +922,7 @@ namespace chainbase {
                       _revision(s._revision) {
             }
 
-            session(vector<std::unique_ptr<abstract_session>> &&s)
+            session(std::vector<boost::interprocess::unique_ptr<abstract_session>> &&s)
                     : _index_sessions(std::move(s)) {
                 if (_index_sessions.size()) {
                     _revision = _index_sessions[0]->revision();
@@ -940,7 +964,7 @@ namespace chainbase {
             session() {
             }
 
-            vector<std::unique_ptr<abstract_session>> _index_sessions;
+            std::vector<boost::interprocess::unique_ptr<abstract_session>> _index_sessions;
             int64_t _revision = -1;
         };
 
@@ -1008,7 +1032,7 @@ namespace chainbase {
             return idx_ptr;
         }
 
-        auto get_segment_manager() -> decltype(((bip::managed_mapped_file *)nullptr)->get_segment_manager()) {
+        auto get_segment_manager() -> decltype(((boost::interprocess::managed_mapped_file *)nullptr)->get_segment_manager()) {
             return _segment->get_segment_manager();
         }
 
@@ -1114,7 +1138,7 @@ namespace chainbase {
                 Lambda * )
 
         nullptr)()) {
-            read_lock lock(_rw_manager->current_lock(), bip::defer_lock_type());
+            read_lock lock(_rw_manager->current_lock(), boost::interprocess::defer_lock_type());
 #ifdef CHAINBASE_CHECK_LOCKING
             BOOST_ATTRIBUTE_UNUSED
             int_incrementer ii(_read_lock_count);
@@ -1162,23 +1186,23 @@ namespace chainbase {
         }
 
     private:
-        unique_ptr<bip::managed_mapped_file> _segment;
-        unique_ptr<bip::managed_mapped_file> _meta;
+        boost::interprocess::unique_ptr<boost::interprocess::managed_mapped_file> _segment;
+        boost::interprocess::unique_ptr<boost::interprocess::managed_mapped_file> _meta;
         read_write_mutex_manager *_rw_manager = nullptr;
         bool _read_only = false;
-        bip::file_lock _flock;
+        boost::interprocess::file_lock _flock;
 
         /**
          * This is a sparse list of known indicies kept to accelerate creation of undo sessions
          */
-        vector<abstract_index *> _index_list;
+        std::vector<abstract_index *> _index_list;
 
         /**
          * This is a full map (size 2^16) of all possible index designed for constant time lookup
          */
-        vector<unique_ptr<abstract_index>> _index_map;
+        std::vector<boost::interprocess::unique_ptr<abstract_index>> _index_map;
 
-        bfs::path _data_dir;
+        boost::filesystem::path _data_dir;
 
         int32_t _read_lock_count = 0;
         int32_t _write_lock_count = 0;
