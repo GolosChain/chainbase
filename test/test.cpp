@@ -133,7 +133,7 @@ BOOST_AUTO_TEST_CASE(open_and_create) {
         BOOST_REQUIRE_EQUAL(new_book.a, copy_new_book.a);
         BOOST_REQUIRE_EQUAL(new_book.b, copy_new_book.b);
     } catch (...) {
-        bfs::remove_all(temp);
+        boost::filesystem::remove_all(temp);
         throw;
     }
 }
