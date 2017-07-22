@@ -206,30 +206,30 @@ namespace chainbase {
         int32_t &_target;
     };
 
-    template<typename MultiIndexType>
-    class secondary_index {
-    public:
-        typedef boost::interprocess::managed_mapped_file::segment_manager segment_manager_type;
-        typedef MultiIndexType index_type;
-        typedef typename index_type::value_type value_type;
-        typedef boost::interprocess::allocator<secondary_index<MultiIndexType>, segment_manager_type> allocator_type;
-        typedef boost::interprocess::deleter<secondary_index<MultiIndexType>, segment_manager_type> deleter_type;
-
-        virtual ~secondary_index() {
-        };
-
-        virtual void object_inserted(const value_type &obj) {
-        };
-
-        virtual void object_removed(const value_type &obj) {
-        };
-
-        virtual void about_to_modify(const value_type &before) {
-        };
-
-        virtual void object_modified(const value_type &after) {
-        };
-    };
+//    template<typename MultiIndexType>
+//    class secondary_index {
+//    public:
+//        typedef boost::interprocess::managed_mapped_file::segment_manager segment_manager_type;
+//        typedef MultiIndexType index_type;
+//        typedef typename index_type::value_type value_type;
+//        typedef boost::interprocess::allocator<secondary_index<MultiIndexType>, segment_manager_type> allocator_type;
+//        typedef boost::interprocess::deleter<secondary_index<MultiIndexType>, segment_manager_type> deleter_type;
+//
+//        virtual ~secondary_index() {
+//        };
+//
+//        virtual void object_inserted(const value_type &obj) {
+//        };
+//
+//        virtual void object_removed(const value_type &obj) {
+//        };
+//
+//        virtual void about_to_modify(const value_type &before) {
+//        };
+//
+//        virtual void object_modified(const value_type &after) {
+//        };
+//    };
 
     /**
      *  The value_type stored in the multiindex container must have a integer field with the name 'id'.  This will
@@ -703,19 +703,19 @@ namespace chainbase {
         uint32_t _size_of_value_type = 0;
         uint32_t _size_of_this = 0;
 
-        boost::interprocess::vector<
-                boost::interprocess::shared_ptr<
-                        secondary_index<MultiIndexType>,
-                        typename secondary_index<MultiIndexType>::allocator_type,
-                        typename secondary_index<MultiIndexType>::deleter_type
-                >, allocator<
-                        boost::interprocess::shared_ptr<
-                                secondary_index<MultiIndexType>,
-                                typename secondary_index<MultiIndexType>::allocator_type,
-                                typename secondary_index<MultiIndexType>::deleter_type
-                        >
-                >
-        > _sindex;
+//        boost::interprocess::vector<
+//                boost::interprocess::shared_ptr<
+//                        secondary_index<MultiIndexType>,
+//                        typename secondary_index<MultiIndexType>::allocator_type,
+//                        typename secondary_index<MultiIndexType>::deleter_type
+//                >, allocator<
+//                        boost::interprocess::shared_ptr<
+//                                secondary_index<MultiIndexType>,
+//                                typename secondary_index<MultiIndexType>::allocator_type,
+//                                typename secondary_index<MultiIndexType>::deleter_type
+//                        >
+//                >
+//        > _sindex;
     };
 
     class abstract_session {
