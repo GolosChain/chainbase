@@ -250,7 +250,9 @@ namespace chainbase {
         generic_index(allocator<value_type> a)
                 : _stack(a), _indices(a),
                   _size_of_value_type(sizeof(typename MultiIndexType::node_type)),
-                  _size_of_this(sizeof(*this)), _sindex(a) {
+                  _size_of_this(sizeof(*this))
+//                  , _sindex(a)
+                  {
         }
 
         void validate() const {
