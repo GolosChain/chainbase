@@ -598,37 +598,37 @@ namespace chainbase {
             remove(*val);
         }
 
-        template<typename T>
-        typename boost::interprocess::vector<
-                boost::interprocess::shared_ptr<
-                        secondary_index<typename T::index_type>,
-                        typename secondary_index<typename T::index_type>::allocator_type,
-                        typename secondary_index<typename T::index_type>::deleter_type
-                >, allocator<
-                        boost::interprocess::shared_ptr<
-                                secondary_index<typename T::index_type>,
-                                typename secondary_index<typename T::index_type>::allocator_type,
-                                typename secondary_index<typename T::index_type>::deleter_type
-                        >
-                >
-        >::reference add_secondary_index() {
-            segment_manager_type *seg_m = _sindex.get_allocator().get_segment_manager();
-            _sindex.emplace_back(new secondary_index<typename T::index_type>(),
-                    typename secondary_index<typename T::index_type>::allocator_type(seg_m),
-                    typename secondary_index<typename T::index_type>::deleter_type(seg_m));
-            return _sindex.back();
-        }
-
-        template<typename T>
-        const T &get_secondary_index() const {
-            for (const auto &item : _sindex) {
-                const T *result = dynamic_cast<const T *>(item.get());
-                if (result != nullptr) {
-                    return *result;
-                }
-            }
-            BOOST_THROW_EXCEPTION(std::logic_error("invalid index type"));
-        }
+//        template<typename T>
+//        typename boost::interprocess::vector<
+//                boost::interprocess::shared_ptr<
+//                        secondary_index<typename T::index_type>,
+//                        typename secondary_index<typename T::index_type>::allocator_type,
+//                        typename secondary_index<typename T::index_type>::deleter_type
+//                >, allocator<
+//                        boost::interprocess::shared_ptr<
+//                                secondary_index<typename T::index_type>,
+//                                typename secondary_index<typename T::index_type>::allocator_type,
+//                                typename secondary_index<typename T::index_type>::deleter_type
+//                        >
+//                >
+//        >::reference add_secondary_index() {
+//            segment_manager_type *seg_m = _sindex.get_allocator().get_segment_manager();
+//            _sindex.emplace_back(new secondary_index<typename T::index_type>(),
+//                    typename secondary_index<typename T::index_type>::allocator_type(seg_m),
+//                    typename secondary_index<typename T::index_type>::deleter_type(seg_m));
+//            return _sindex.back();
+//        }
+//
+//        template<typename T>
+//        const T &get_secondary_index() const {
+//            for (const auto &item : _sindex) {
+//                const T *result = dynamic_cast<const T *>(item.get());
+//                if (result != nullptr) {
+//                    return *result;
+//                }
+//            }
+//            BOOST_THROW_EXCEPTION(std::logic_error("invalid index type"));
+//        }
 
     private:
         bool enabled() const {
