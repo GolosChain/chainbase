@@ -283,18 +283,18 @@ namespace chainbase {
             ++_next_id;
             on_create(*insert_result.first);
 
-            for (const auto &item : _sindex) {
-                item->object_inserted(*insert_result.first);
-            }
+//            for (const auto &item : _sindex) {
+//                item->object_inserted(*insert_result.first);
+//            }
 
             return *insert_result.first;
         }
 
         template<typename Modifier>
         void modify(const value_type &obj, Modifier &&m) {
-            for (const auto &item : _sindex) {
-                item->about_to_modify(obj);
-            }
+//            for (const auto &item : _sindex) {
+//                item->about_to_modify(obj);
+//            }
 
             on_modify(obj);
 
@@ -302,15 +302,15 @@ namespace chainbase {
             if (!ok)
                 BOOST_THROW_EXCEPTION(std::logic_error("Could not modify object, most likely a uniqueness constraint was violated"));
 
-            for (const auto &item : _sindex) {
-                item->object_modified(obj);
-            }
+//            for (const auto &item : _sindex) {
+//                item->object_modified(obj);
+//            }
         }
 
         void remove(const value_type &obj) {
-            for (const auto &item : _sindex) {
-                item->object_removed(obj);
-            }
+//            for (const auto &item : _sindex) {
+//                item->object_removed(obj);
+//            }
             on_remove(obj);
             _indices.erase(_indices.iterator_to(obj));
         }
