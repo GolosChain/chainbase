@@ -1043,6 +1043,13 @@ namespace chainbase {
         }
 
         template<typename MultiIndexType>
+        bool has_index()const {
+            CHAINBASE_REQUIRE_READ_LOCK("get_index", typename MultiIndexType::value_type);
+            typedef generic_index<MultiIndexType> index_type;
+            return _index_map.size() > index_type::value_type::type_id && _index_map[index_type::value_type::type_id];
+        }
+
+        template<typename MultiIndexType>
         const generic_index<MultiIndexType> &get_index() const {
             CHAINBASE_REQUIRE_READ_LOCK("get_index", typename MultiIndexType::value_type);
             typedef generic_index <MultiIndexType> index_type;
@@ -1136,10 +1143,7 @@ namespace chainbase {
         }
 
         template<typename Lambda>
-        auto with_read_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(
-                Lambda * )
-
-        nullptr)()) {
+        auto with_read_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(Lambda * )nullptr)()) {
             read_lock lock(_rw_manager->current_lock(), boost::interprocess::defer_lock_type());
 #ifdef CHAINBASE_CHECK_LOCKING
             BOOST_ATTRIBUTE_UNUSED
@@ -1150,8 +1154,7 @@ namespace chainbase {
                 lock.lock();
             } else {
 
-                if (!lock.timed_lock(boost::posix_time::microsec_clock::universal_time() +
-                                     boost::posix_time::microseconds(wait_micro)))
+                if (!lock.timed_lock(boost::posix_time::microsec_clock::universal_time() + boost::posix_time::microseconds(wait_micro)))
                     BOOST_THROW_EXCEPTION(std::runtime_error("unable to acquire lock"));
             }
 
@@ -1159,10 +1162,7 @@ namespace chainbase {
         }
 
         template<typename Lambda>
-        auto with_write_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(
-                Lambda * )
-
-        nullptr)()) {
+        auto with_write_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(Lambda * )nullptr)()) {
             if (_read_only)
                 BOOST_THROW_EXCEPTION(std::logic_error("cannot acquire write lock on read-only process"));
 
