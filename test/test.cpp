@@ -2,44 +2,48 @@
 
 #include <boost/test/unit_test.hpp>
 
-#include <chainbase/chainbase.hpp>
+#include <chainbase/database.hpp>
+#include <chainbase/object.hpp>
 
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/member.hpp>
-
+#include <boost/filesystem.hpp>
 #include <iostream>
 
 using namespace chainbase;
 using namespace boost::multi_index;
 
 //BOOST_TEST_SUITE( serialization_tests, clean_database_fixture )
+namespace dddd {
+    struct book : public chainbase::object<0, book> {
 
-struct book : public chainbase::object<0, book> {
+        template<typename Constructor, typename Allocator>
+        book(Constructor &&c, Allocator &&a) {
+            c(*this);
+        }
 
-    template<typename Constructor, typename Allocator>
-    book(Constructor &&c, Allocator &&a) {
-        c(*this);
-    }
+        constexpr static const char* name = "book";
 
-    id_type id;
-    int a = 0;
-    int b = 1;
-};
+        id_type id;
+        int a = 0;
+        int b = 1;
+    };
 
-typedef multi_index_container<
-        book,
-        indexed_by<
-                ordered_unique<member<book, book::id_type, &book::id>>,
-                ordered_non_unique<BOOST_MULTI_INDEX_MEMBER(book, int, a)>,
-                ordered_non_unique<BOOST_MULTI_INDEX_MEMBER(book, int, b)>
-        >,
-        chainbase::allocator<book>
-> book_index;
-
-CHAINBASE_SET_INDEX_TYPE(book, book_index)
+    typedef multi_index_container<
+            book,
+            indexed_by<
+                    ordered_unique<member<book, book::id_type, &book::id>>,
+                    ordered_non_unique<BOOST_MULTI_INDEX_MEMBER(book, int, a) >,
+                    ordered_non_unique<BOOST_MULTI_INDEX_MEMBER(book, int, b) >
+            >
+            ///chainbase::allocator<book>
+    > book_index;
+}
+CHAINBASE_SET_INDEX_TYPE(dddd::book, dddd::book_index)
 
 
+/*
 BOOST_AUTO_TEST_CASE(open_and_create) {
     boost::filesystem::path temp = boost::filesystem::unique_path();
     try {
@@ -132,6 +136,79 @@ BOOST_AUTO_TEST_CASE(open_and_create) {
 
         BOOST_REQUIRE_EQUAL(new_book.a, copy_new_book.a);
         BOOST_REQUIRE_EQUAL(new_book.b, copy_new_book.b);
+    } catch (...) {
+        boost::filesystem::remove_all(temp);
+        throw;
+    }
+}
+*/
+
+
+
+int main(){
+    boost::filesystem::path temp = boost::filesystem::unique_path();
+    try {
+        std::cerr << temp.native() << " \n";
+
+        //chainbase::database db;
+
+
+        chainbase::database db(temp, database::read_write, 1024 * 1024 * 8);
+        db.add_index<dddd::book_index>();
+
+
+        const auto &new_book = db.create<dddd::book>(
+                [](dddd::book &b) {
+                    b.a = 3;
+                    b.b = 4;
+                }
+        );
+
+
+        db.modify(
+                new_book,
+                [&](dddd::book &b) {
+                    b.a = 5;
+                    b.b = 6;
+                }
+        );
+
+
+        {
+            auto session = db.start_undo_session(true);
+            db.modify(new_book, [&](dddd::book &b) {
+                b.a = 7;
+                b.b = 8;
+            });
+
+        }
+
+
+
+        {
+            auto session = db.start_undo_session(true);
+            const auto &book2 = db.create<dddd::book>([&](dddd::book &b) {
+                b.a = 9;
+                b.b = 10;
+            });
+
+        }
+
+
+
+        {
+            auto session = db.start_undo_session(true);
+            db.modify(new_book, [&](dddd::book &b) {
+                b.a = 7;
+                b.b = 8;
+            });
+
+            session.push();
+        }
+
+        db.undo();
+
+
     } catch (...) {
         boost::filesystem::remove_all(temp);
         throw;
