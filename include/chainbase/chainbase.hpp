@@ -49,13 +49,12 @@
 
 namespace chainbase {
 
-    template<typename T>
-    using allocator = boost::interprocess::allocator<T, boost::interprocess::managed_mapped_file::segment_manager>;
+    template<typename T> using allocator = boost::interprocess::allocator<T,
+            boost::interprocess::managed_mapped_file::segment_manager>;
 
     typedef boost::interprocess::basic_string<char, std::char_traits<char>, allocator<char>> shared_string;
 
-    template<typename T>
-    using shared_vector = std::vector<T, allocator<T>>;
+    template<typename T> using shared_vector = std::vector<T, allocator<T>>;
 
     struct strcmp_less {
         bool operator()(const shared_string &a, const shared_string &b) const {
@@ -114,7 +113,33 @@ namespace chainbase {
     };
 
     /**
-     * Database primitive object
+     *  @brief base for all database objects
+     *
+     *  The object is the fundamental building block of the database and
+     *  is the level upon which undo/redo operations are performed.  Objects
+     *  are used to track data and their relationships and provide an effecient
+     *  means to find and update information.
+     *
+     *  Objects are assigned a unique and sequential object ID by the database within
+     *  the id_space defined in the object.
+     *
+     *  All objects must be serializable via FC_REFLECT() and their content must be
+     *  faithfully restored.   Additionally all objects must be copy-constructable and
+     *  assignable in a relatively efficient manner.  In general this means that objects
+     *  should only refer to other objects by ID and avoid expensive operations when
+     *  they are copied, especially if they are modified frequently.
+     *
+     *  Additionally all objects may be annotated by plugins which wish to maintain
+     *  additional information to an object.  There can be at most one annotation
+     *  per id_space for each object.   An example of an annotation would be tracking
+     *  extra data not required by validation such as the name and description of
+     *  a user asset.  By carefully organizing how information is organized and
+     *  tracked systems can minimize the workload to only that which is necessary
+     *  to perform their function.
+     *
+     *  @note Do not use multiple inheritance with object because the code assumes
+     *  a static_cast will work between object and derived types.
+     *
      * @tparam TypeNumber TypeNumber must be unique for each object
      * @tparam Derived Stored object type
      * @tparam VersionNumber Stored object version number
@@ -133,9 +158,7 @@ namespace chainbase {
 
         typedef object_id<Derived> id_type;
 
-        static const uint32_t type_id =
-                VersionNumber - 1 ? (VersionNumber << 16) + TypeNumber
-                                  : TypeNumber;
+        static const uint32_t type_id = VersionNumber - 1 ? (VersionNumber << 16) + TypeNumber : TypeNumber;
         static const uint32_t version_number = VersionNumber;
     };
 
@@ -166,11 +189,12 @@ namespace chainbase {
         template<typename T>
         undo_state(allocator<T> al)
                 :old_values(id_value_allocator_type(al.get_segment_manager())),
-                 removed_values(id_value_allocator_type(al.get_segment_manager())),
-                 new_ids(id_allocator_type(al.get_segment_manager())) {
+                removed_values(id_value_allocator_type(al.get_segment_manager())),
+                new_ids(id_allocator_type(al.get_segment_manager())) {
         }
 
-        typedef boost::interprocess::map<id_type, value_type, std::less<id_type>, id_value_allocator_type> id_value_type_map;
+        typedef boost::interprocess::map<id_type, value_type, std::less<id_type>,
+                id_value_allocator_type> id_value_type_map;
         typedef boost::interprocess::set<id_type, std::less<id_type>, id_allocator_type> id_type_set;
 
         id_value_type_map old_values;
@@ -247,18 +271,16 @@ namespace chainbase {
         typedef boost::interprocess::deleter<generic_index, segment_manager_type> deleter_type;
         typedef undo_state<value_type> undo_state_type;
 
-        generic_index(allocator<value_type> a)
-                : _stack(a), _indices(a),
-                  _size_of_value_type(sizeof(typename MultiIndexType::node_type)),
-                  _size_of_this(sizeof(*this))
+        generic_index(allocator<value_type> a) : _stack(a), _indices(a),
+                _size_of_value_type(sizeof(typename MultiIndexType::node_type)), _size_of_this(sizeof(*this))
 //                  , _sindex(a)
-                  {
+        {
         }
 
         void validate() const {
-            if (sizeof(typename MultiIndexType::node_type) !=
-                _size_of_value_type || sizeof(*this) != _size_of_this)
-                BOOST_THROW_EXCEPTION(std::runtime_error("content of memory does not match data expected by executable"));
+            if (sizeof(typename MultiIndexType::node_type) != _size_of_value_type || sizeof(*this) != _size_of_this)
+                BOOST_THROW_EXCEPTION(
+                        std::runtime_error("content of memory does not match data expected by executable"));
         }
 
         /**
@@ -277,7 +299,8 @@ namespace chainbase {
             auto insert_result = _indices.emplace(constructor, _indices.get_allocator());
 
             if (!insert_result.second) {
-                BOOST_THROW_EXCEPTION(std::logic_error("could not insert object, most likely a uniqueness constraint was violated"));
+                BOOST_THROW_EXCEPTION(
+                        std::logic_error("could not insert object, most likely a uniqueness constraint was violated"));
             }
 
             ++_next_id;
@@ -300,7 +323,8 @@ namespace chainbase {
 
             auto ok = _indices.modify(_indices.iterator_to(obj), m);
             if (!ok)
-                BOOST_THROW_EXCEPTION(std::logic_error("Could not modify object, most likely a uniqueness constraint was violated"));
+                BOOST_THROW_EXCEPTION(
+                        std::logic_error("Could not modify object, most likely a uniqueness constraint was violated"));
 
 //            for (const auto &item : _sindex) {
 //                item->object_modified(obj);
@@ -344,8 +368,7 @@ namespace chainbase {
 
         class session {
         public:
-            session(session &&mv)
-                    : _index(mv._index), _apply(mv._apply) {
+            session(session &&mv) : _index(mv._index), _apply(mv._apply) {
                 mv._apply = false;
             }
 
@@ -394,8 +417,7 @@ namespace chainbase {
         private:
             friend class generic_index;
 
-            session(generic_index &idx, int64_t revision)
-                    : _index(idx), _revision(revision) {
+            session(generic_index &idx, int64_t revision) : _index(idx), _revision(revision) {
                 if (revision == -1) {
                     _apply = false;
                 }
@@ -442,7 +464,8 @@ namespace chainbase {
                     v = std::move(item.second);
                 });
                 if (!ok)
-                    BOOST_THROW_EXCEPTION(std::logic_error("Could not modify object, most likely a uniqueness constraint was violated"));
+                    BOOST_THROW_EXCEPTION(std::logic_error(
+                            "Could not modify object, most likely a uniqueness constraint was violated"));
             }
 
             for (auto id : head.new_ids) {
@@ -453,7 +476,8 @@ namespace chainbase {
             for (auto &item : head.removed_values) {
                 bool ok = _indices.emplace(std::move(item.second)).second;
                 if (!ok)
-                    BOOST_THROW_EXCEPTION(std::logic_error("Could not restore object, most likely a uniqueness constraint was violated"));
+                    BOOST_THROW_EXCEPTION(std::logic_error(
+                            "Could not restore object, most likely a uniqueness constraint was violated"));
             }
 
             _stack.pop_back();
@@ -521,19 +545,16 @@ namespace chainbase {
             // We can only be outside type A/AB (the nop path) if B is not nop, so it suffices to iterate through B's three containers.
 
             for (const auto &item : state.old_values) {
-                if (prev_state.new_ids.find(item.second.id) !=
-                    prev_state.new_ids.end()) {
+                if (prev_state.new_ids.find(item.second.id) != prev_state.new_ids.end()) {
                     // new+upd -> new, type A
                     continue;
                 }
-                if (prev_state.old_values.find(item.second.id) !=
-                    prev_state.old_values.end()) {
+                if (prev_state.old_values.find(item.second.id) != prev_state.old_values.end()) {
                     // upd(was=X) + upd(was=Y) -> upd(was=X), type A
                     continue;
                 }
                 // del+upd -> N/A
-                assert(prev_state.removed_values.find(item.second.id) ==
-                       prev_state.removed_values.end());
+                assert(prev_state.removed_values.find(item.second.id) == prev_state.removed_values.end());
                 // nop+upd(was=Y) -> upd(was=Y), type B
                 prev_state.old_values.emplace(std::move(item));
             }
@@ -545,8 +566,7 @@ namespace chainbase {
 
             // *+del
             for (auto &obj : state.removed_values) {
-                if (prev_state.new_ids.find(obj.second.id) !=
-                    prev_state.new_ids.end()) {
+                if (prev_state.new_ids.find(obj.second.id) != prev_state.new_ids.end()) {
                     // new + del -> nop (type C)
                     prev_state.new_ids.erase(obj.second.id);
                     continue;
@@ -559,8 +579,7 @@ namespace chainbase {
                     continue;
                 }
                 // del + del -> N/A
-                assert(prev_state.removed_values.find(obj.second.id) ==
-                       prev_state.removed_values.end());
+                assert(prev_state.removed_values.find(obj.second.id) == prev_state.removed_values.end());
                 // nop + del(was=Y) -> del(was=Y)
                 prev_state.removed_values.emplace(std::move(obj)); //[obj.second->id] = std::move(obj.second);
             }
@@ -801,7 +820,8 @@ namespace chainbase {
         }
 
         virtual boost::interprocess::unique_ptr<abstract_session> start_undo_session(bool enabled) override {
-            return boost::interprocess::unique_ptr<abstract_session>(new session_impl<typename BaseIndex::session>(_base.start_undo_session(enabled)));
+            return boost::interprocess::unique_ptr<abstract_session>(
+                    new session_impl<typename BaseIndex::session>(_base.start_undo_session(enabled)));
         }
 
         virtual void set_revision(uint64_t revision) override {
@@ -859,8 +879,7 @@ namespace chainbase {
 
         void next_lock() {
             _current_lock++;
-            new(&_locks[_current_lock %
-                        CHAINBASE_NUM_RW_LOCKS]) read_write_mutex();
+            new(&_locks[_current_lock % CHAINBASE_NUM_RW_LOCKS]) read_write_mutex();
         }
 
         read_write_mutex &current_lock() {
@@ -883,8 +902,7 @@ namespace chainbase {
     class database {
     public:
         enum open_flags {
-            read_only = 0,
-            read_write = 1
+            read_only = 0, read_write = 1
         };
 
         void open(const boost::filesystem::path &dir, uint32_t write = read_only, uint64_t shared_file_size = 0);
@@ -902,15 +920,13 @@ namespace chainbase {
         void require_lock_fail(const char *method, const char *lock_type, const char *tname) const;
 
         void require_read_lock(const char *method, const char *tname) const {
-            if (BOOST_UNLIKELY(_enable_require_locking & _read_only &
-                               (_read_lock_count <= 0))) {
+            if (BOOST_UNLIKELY(_enable_require_locking & _read_only & (_read_lock_count <= 0))) {
                 require_lock_fail(method, "read", tname);
             }
         }
 
         void require_write_lock(const char *method, const char *tname) {
-            if (BOOST_UNLIKELY(
-                        _enable_require_locking & (_write_lock_count <= 0))) {
+            if (BOOST_UNLIKELY(_enable_require_locking & (_write_lock_count <= 0))) {
                 require_lock_fail(method, "write", tname);
             }
         }
@@ -919,13 +935,11 @@ namespace chainbase {
 
         struct session {
         public:
-            session(session &&s)
-                    : _index_sessions(std::move(s._index_sessions)),
-                      _revision(s._revision) {
+            session(session &&s) : _index_sessions(std::move(s._index_sessions)), _revision(s._revision) {
             }
 
-            session(std::vector<boost::interprocess::unique_ptr<abstract_session>> &&s)
-                    : _index_sessions(std::move(s)) {
+            session(std::vector<boost::interprocess::unique_ptr<abstract_session>> &&s) : _index_sessions(
+                    std::move(s)) {
                 if (_index_sessions.size()) {
                     _revision = _index_sessions[0]->revision();
                 }
@@ -1004,21 +1018,19 @@ namespace chainbase {
 
             std::string type_name = boost::core::demangle(typeid(typename index_type::value_type).name());
 
-            if (!(_index_map.size() <= type_id ||
-                  _index_map[type_id] == nullptr)) {
-                BOOST_THROW_EXCEPTION(std::logic_error(
-                        type_name + "::type_id is already in use"));
+            if (!(_index_map.size() <= type_id || _index_map[type_id] == nullptr)) {
+                BOOST_THROW_EXCEPTION(std::logic_error(type_name + "::type_id is already in use"));
             }
 
             index_type *idx_ptr = nullptr;
             if (!_read_only) {
-                idx_ptr = _segment->find_or_construct<index_type>(type_name.c_str())(index_alloc(_segment->get_segment_manager()));
+                idx_ptr = _segment->find_or_construct<index_type>(type_name.c_str())(
+                        index_alloc(_segment->get_segment_manager()));
             } else {
                 idx_ptr = _segment->find<index_type>(type_name.c_str()).first;
                 if (!idx_ptr)
                     BOOST_THROW_EXCEPTION(std::runtime_error(
-                            "unable to find index for " + type_name +
-                            " in read only database"));
+                                                  "unable to find index for " + type_name + " in read only database"));
             }
 
             idx_ptr->validate();
@@ -1034,7 +1046,7 @@ namespace chainbase {
             return idx_ptr;
         }
 
-        auto get_segment_manager() -> decltype(((boost::interprocess::managed_mapped_file *)nullptr)->get_segment_manager()) {
+        auto get_segment_manager() -> decltype(((boost::interprocess::managed_mapped_file *) nullptr)->get_segment_manager()) {
             return _segment->get_segment_manager();
         }
 
@@ -1060,13 +1072,15 @@ namespace chainbase {
         }
 
         template<typename MultiIndexType, typename ByIndex>
-        auto get_index() const -> decltype(((generic_index<MultiIndexType> *)(nullptr))->indicies().template get<ByIndex>()) {
+        auto get_index() const -> decltype(((generic_index<MultiIndexType> *) (nullptr))->indicies().template get<
+                ByIndex>()) {
             CHAINBASE_REQUIRE_READ_LOCK("get_index", typename MultiIndexType::value_type);
             typedef generic_index <MultiIndexType> index_type;
             typedef index_type *index_type_ptr;
             assert(_index_map.size() > index_type::value_type::type_id);
             assert(_index_map[index_type::value_type::type_id]);
-            return index_type_ptr(_index_map[index_type::value_type::type_id]->get())->indicies().template get<ByIndex>();
+            return index_type_ptr(_index_map[index_type::value_type::type_id]->get())->indicies().template get<
+                    ByIndex>();
         }
 
         template<typename MultiIndexType>
@@ -1162,7 +1176,13 @@ namespace chainbase {
         }
 
         template<typename Lambda>
+<<<<<<< Updated upstream
         auto with_write_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(Lambda * )nullptr)()) {
+=======
+        auto with_write_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(Lambda * )
+
+        nullptr)()) {
+>>>>>>> Stashed changes
             if (_read_only)
                 BOOST_THROW_EXCEPTION(std::logic_error("cannot acquire write lock on read-only process"));
 
@@ -1178,8 +1198,7 @@ namespace chainbase {
                 while (!lock.timed_lock(boost::posix_time::microsec_clock::universal_time() +
                                         boost::posix_time::microseconds(wait_micro))) {
                     _rw_manager->next_lock();
-                    std::cerr << "Lock timeout, moving to lock "
-                              << _rw_manager->current_lock_num() << std::endl;
+                    std::cerr << "Lock timeout, moving to lock " << _rw_manager->current_lock_num() << std::endl;
                     lock = write_lock(_rw_manager->current_lock(), boost::defer_lock_t());
                 }
             }
@@ -1211,7 +1230,7 @@ namespace chainbase {
         bool _enable_require_locking = false;
     };
 
-    template<typename Object, typename... Args>
-    using shared_multi_index_container = boost::multi_index_container<Object, Args..., chainbase::allocator<Object>>;
+    template<typename Object, typename... Args> using shared_multi_index_container = boost::multi_index_container<
+            Object, Args..., chainbase::allocator<Object>>;
 }  // namepsace chainbase
 
