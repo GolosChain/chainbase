@@ -1177,13 +1177,7 @@ namespace chainbase {
         }
 
         template<typename Lambda>
-<<<<<<< Updated upstream
         auto with_write_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(Lambda * )nullptr)()) {
-=======
-        auto with_write_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(Lambda * )
-
-        nullptr)()) {
->>>>>>> Stashed changes
             if (_read_only)
                 BOOST_THROW_EXCEPTION(std::logic_error("cannot acquire write lock on read-only process"));
 
