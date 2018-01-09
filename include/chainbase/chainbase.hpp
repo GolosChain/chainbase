@@ -114,7 +114,7 @@ namespace chainbase {
 
     /**
      *  @defgroup objects Objects
-     *  @brief base for all database objects
+     *  @brief Base for all database objects
      *
      *  The object is the fundamental building block of the database and
      *  is the level upon which undo/redo operations are performed.  Objects
