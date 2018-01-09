@@ -113,7 +113,7 @@ namespace chainbase {
     };
 
     /**
-     *  @defgroup object Object
+     *  @defgroup objects Objects
      *  @brief base for all database objects
      *
      *  The object is the fundamental building block of the database and
