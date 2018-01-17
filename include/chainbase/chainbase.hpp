@@ -141,15 +141,15 @@ namespace chainbase {
      *  @note Do not use multiple inheritance with object because the code assumes
      *  a static_cast will work between object and derived types.
      *
-     * @tparam TypeNumber TypeNumber must be unique for each object
-     * @tparam Derived Stored object type
-     * @tparam VersionNumber Stored object version number
+     *  @tparam TypeNumber TypeNumber must be unique for each object
+     *  @tparam Derived Stored object type
+     *  @tparam VersionNumber Stored object version number
      *
-     * Typical type_id space usage for 0xDEADBEEF for little-endian systems is:
-     * 0xEF - Unused
-     * 0xBE - Objects version identifier
-     * 0xAD - Objects space identifier. For example plugins need to define object type IDs such that they do not conflict globally. If each plugin uses the upper 8 bits as a space identifier, with 0 being for chain, then the lower 8 bits are free for each plugin to define as they see fit. @file tags_plugin.hpp:41
-     * 0xDE - Object identifier.
+     *  Typical type_id space usage for 0xDEADBEEF for little-endian systems is:
+     *  0xEF - Unused
+     *  0xBE - Objects version identifier
+     *  0xAD - Objects space identifier. For example plugins need to define object type IDs such that they do not conflict globally. If each plugin uses the upper 8 bits as a space identifier, with 0 being for chain, then the lower 8 bits are free for each plugin to define as they see fit. @file tags_plugin.hpp:41
+     *  0xDE - Object identifier.
      */
 
     template<uint32_t TypeNumber, typename Derived, uint32_t VersionNumber = 1>
