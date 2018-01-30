@@ -114,7 +114,6 @@ namespace chainbase {
 
     /**
      *  @defgroup objects Objects
-     *  @brief Base for all database objects
      *
      *  The object is the fundamental building block of the database and
      *  is the level upon which undo/redo operations are performed.  Objects
@@ -138,9 +137,10 @@ namespace chainbase {
      *  tracked systems can minimize the workload to only that which is necessary
      *  to perform their function.
      *
-     *  @note Do not use multiple inheritance with object because the code assumes
-     *  a static_cast will work between object and derived types.
      *
+     *  @class object
+     *  @ingroup objects
+     *  @brief Base for all database objects
      *  @tparam TypeNumber TypeNumber must be unique for each object
      *  @tparam Derived Stored object type
      *  @tparam VersionNumber Stored object version number
@@ -150,6 +150,9 @@ namespace chainbase {
      *  0xBE - Objects version identifier
      *  0xAD - Objects space identifier. For example plugins need to define object type IDs such that they do not conflict globally. If each plugin uses the upper 8 bits as a space identifier, with 0 being for chain, then the lower 8 bits are free for each plugin to define as they see fit. @file tags_plugin.hpp:41
      *  0xDE - Object identifier.
+     *
+     *  @note Do not use multiple inheritance with object because the code assumes
+     *  a static_cast will work between object and derived types.
      */
 
     template<uint32_t TypeNumber, typename Derived, uint32_t VersionNumber = 1>
