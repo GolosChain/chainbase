@@ -64,7 +64,8 @@ endif()
 
 
 list(APPEND HEADERS
-        include/chainbase/cached_level_map.hpp
+        #include/chainbase/cached_level_map.hpp
+        include/chainbase/datastream_back.hpp
         include/chainbase/exception.hpp
         include/chainbase/fast_level_map.hpp
         include/chainbase/flat_index.hpp
@@ -72,7 +73,7 @@ list(APPEND HEADERS
         include/chainbase/generic_index.hpp
         include/chainbase/index.hpp
         include/chainbase/level_map.hpp
-        include/chainbase/level_pod_map.hpp
+        #include/chainbase/level_pod_map.hpp
         include/chainbase/object.hpp
         include/chainbase/object_database.hpp
         include/chainbase/object_id.hpp
@@ -116,8 +117,7 @@ endif()
 list(APPEND LEVEL_DB_SOURCES "${LEVELDB_PORT_FILE}")
 add_library( leveldb ${LEVEL_DB_SOURCES} )
 target_link_libraries( leveldb ${LEVELDB_BUILD_LIBRARIES} )
-target_include_directories( leveldb PRIVATE ${LEVELDB_BUILD_PRIVATE_INCLUDES}
-        PUBLIC "${LEVEL_DB_DIR}/include" )
+target_include_directories( leveldb PRIVATE ${LEVELDB_BUILD_PRIVATE_INCLUDES} PUBLIC "${LEVEL_DB_DIR}/include" )
 set_target_properties(leveldb PROPERTIES COMPILE_DEFINITIONS "${LEVELDB_BUILD_DEFINES}")
 
 include(ExternalProject)
@@ -208,6 +208,7 @@ target_link_libraries(
         rocksdb
         #snappy
         ${ZLIB_LIBRARIES}
+        leveldb
         ${BZIP2_LIBRARIES}
 )
 

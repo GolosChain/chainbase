@@ -1,10 +1,11 @@
 #pragma once
-#include <chainbase/object_id.hpp>
-#include <fc/io/raw.hpp>
-#include <fc/crypto/city.hpp>
-#include <fc/uint128.hpp>
 
-namespace chainbase { namespace db {
+#include <boost/container/flat_map.hpp>
+#include <chainbase/object_id.hpp>
+#include <vector>
+#include <string>
+namespace chainbase {
+    namespace db {
 
         /**
          *  @brief base for all database objects
@@ -34,24 +35,27 @@ namespace chainbase { namespace db {
          *  @note Do not use multiple inheritance with object because the code assumes
          *  a static_cast will work between object and derived types.
          */
-        class object
-        {
+        class object {
         public:
-            object(){}
-            virtual ~object(){}
+            object() {}
+
+            virtual ~object() {}
 
             static const uint8_t space_id = 0;
-            static const uint8_t type_id  = 0;
+            static const uint8_t type_id = 0;
 
 
             // serialized
-            object_id_type          id;
+            object_id_type id;
 
             /// these methods are implemented for derived classes by inheriting abstract_object<DerivedClass>
-            virtual unique_ptr<object> clone()const = 0;
-            virtual void               move_from( object& obj ) = 0;
-            virtual variant            to_variant()const  = 0;
-            virtual vector<char>       pack()const = 0;
+            virtual unique_ptr<object> clone() const = 0;
+
+            virtual void move_from(object &obj) = 0;
+
+            virtual /*variant*/ std::string to_variant() const = 0;
+
+            virtual std::vector<char> pack() const = 0;
         };
 
         /**
@@ -64,15 +68,21 @@ namespace chainbase { namespace db {
         template<typename DerivedClass>
         class abstract_object : public object {
         public:
-            virtual unique_ptr<object> clone()const {
-                return unique_ptr<object>(new DerivedClass( *static_cast<const DerivedClass*>(this) ));
+            virtual std::unique_ptr<object> clone() const {
+                return std::unique_ptr<object>(new DerivedClass(*static_cast<const DerivedClass *>(this)));
             }
 
-            virtual void    move_from( object& obj ) {
-                static_cast<DerivedClass&>(*this) = std::move( static_cast<DerivedClass&>(obj) );
+            virtual void move_from(object &obj) {
+                static_cast<DerivedClass &>(*this) = std::move(static_cast<DerivedClass &>(obj));
             }
-            virtual variant to_variant()const { return variant( static_cast<const DerivedClass&>(*this) ); }
-            virtual vector<char> pack()const  { return fc::raw::pack( static_cast<const DerivedClass&>(*this) ); }
+
+            virtual /*variant*/std::string to_variant() const {
+                return std::string(); //variant(static_cast<const DerivedClass &>(*this));
+            }
+
+            virtual std::vector<char> pack() const {
+                return std::vector<char>();//fc::raw::pack(static_cast<const DerivedClass &>(*this));
+            }
         };
 
         /**
@@ -83,12 +93,13 @@ namespace chainbase { namespace db {
         class annotated_object : public abstract_object<DerivedClass> {
         public:
             /** return object_id_type() if no anotation is found for id_space */
-            object_id_type          get_annotation( uint8_t annotation_id_space )const {
+            object_id_type get_annotation(uint8_t annotation_id_space) const {
                 auto itr = annotations.find(annotation_id_space);
-                if( itr != annotations.end() ) return itr->second;
+                if (itr != annotations.end()) return itr->second;
                 return object_id_type();
             }
-            void                    set_annotation( object_id_type id ) {
+
+            void set_annotation(object_id_type id) {
                 annotations[id.space()] = id;
             }
 
@@ -96,10 +107,8 @@ namespace chainbase { namespace db {
              *  Annotations should be accessed via get_annotation and set_annotation so
              *  that they can be maintained in sorted order.
              */
-            flat_map<uint8_t,object_id_type> annotations;
+            boost::container::flat_map <uint8_t, object_id_type> annotations;
         };
 
-} } // chainbase::db
-
-FC_REFLECT( chainbase::db::object, (id) )
-FC_REFLECT_DERIVED_TEMPLATE( (typename Derived), chainbase::db::annotated_object<Derived>, (chainbase::db::object), (annotations) )
+    }
+} // chainbase::db

@@ -1,13 +1,9 @@
 #pragma once
 #include <leveldb/db.h>
 #include <leveldb/comparator.h>
-#include <fc/reflect/reflect.hpp>
-#include <fc/io/raw.hpp>
-#include <fc/exception/exception.hpp>
 #include <functional>
 #include <map>
-
-namespace fc { class path; }
+#include <boost/filesystem/path.hpp>
 
 /**
  * This code has no bitshares dependencies, and it
@@ -87,7 +83,7 @@ namespace chainbase { namespace db {
           while( dbase_itr->Valid() ) /* convert dbase objects from legacy TypeVersionNum to current Type */ \
           { \
             TYPE ## VERSIONNUM old_value; /*load old record type*/ \
-            fc::datastream<const char*> dstream( dbase_itr->value().data(), dbase_itr->value().size() ); \
+            datastream<const char*> dstream( dbase_itr->value().data(), dbase_itr->value().size() ); \
             fc::raw::unpack( dstream, old_value ); \
             TYPE new_value(old_value);       /*convert to new record type*/ \
             leveldb::Slice key_slice = dbase_itr->key(); \
@@ -104,6 +100,6 @@ namespace chainbase { namespace db {
         static int dummyResult ## TYPE ## VERSIONNUM  = \
           upgrade_db_mapper::instance()->add_type(fc::get_typename<TYPE ## VERSIONNUM>::name(), UpgradeDb ## TYPE ## VERSIONNUM);
 
-    void try_upgrade_db( const fc::path& dir, leveldb::DB* dbase, const char* record_type, size_t record_type_size );
+    void try_upgrade_db( const boost::filesystem::path& dir, leveldb::DB* dbase, const char* record_type, size_t record_type_size );
 
 } } // namespace db

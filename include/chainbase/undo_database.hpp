@@ -1,21 +1,26 @@
 #pragma once
 
-#include <chainbase/object.hpp>
 #include <deque>
-#include <fc/exception/exception.hpp>
+#include <unordered_map>
+#include <unordered_set>
+#include <memory>
+
+#include <chainbase/object.hpp>
+
 
 namespace chainbase {
     namespace db {
 
         using std::unordered_map;
-        using fc::flat_set;
+        using std::unordered_set;
+        using std::unique_ptr;
 
         class object_database;
 
         struct undo_state {
             unordered_map<object_id_type, unique_ptr < object> > old_values;
             unordered_map<object_id_type, object_id_type> old_index_next_ids;
-            std::unordered_set<object_id_type> new_ids;
+            unordered_set<object_id_type> new_ids;
             unordered_map<object_id_type, unique_ptr < object> > removed;
         };
 
@@ -38,9 +43,9 @@ namespace chainbase {
 
                 ~session() {
                     try {
-                        if (_apply_undo) _db.undo();
-                    } catch (const fc::exception &e) {
-                        elog("${e}", ("e", e.to_detail_string()));
+                        if (_apply_undo)_db.undo();
+                    } catch(...){ //(const fc::exception &e) {
+                        //elog("${e}", ("e", e.to_detail_string()));
                         throw; // maybe crash..
                     }
                 }
