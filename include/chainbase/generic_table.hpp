@@ -21,7 +21,7 @@ namespace chainbase {
          *  to work with arbitrary boost multi_index containers on the same type.
          */
         template<typename ObjectType, typename MultiIndexType>
-        class generic_index : public index {
+        class generic_table : public index {
         public:
             typedef MultiIndexType index_type;
             typedef ObjectType object_type;
@@ -38,7 +38,7 @@ namespace chainbase {
                 item.id = get_next_id();
                 constructor(item);
                 auto insert_result = _indices.insert(std::move(item));
-                assert(insert_result.second);, "Could not create object! Most likely a uniqueness constraint is violated.");
+                assert(insert_result.second);//, "Could not create object! Most likely a uniqueness constraint is violated.");
                 use_next_id();
                 return *insert_result.first;
             }
@@ -64,8 +64,10 @@ namespace chainbase {
                 try {
                     for (const auto &ptr : _indices)
                         inspector(ptr);
+                } catch (...){
+
                 }
-                FC_CAPTURE_AND_RETHROW()
+                //FC_CAPTURE_AND_RETHROW()
             }
 
             const index_type &indices() const { return _indices; }
@@ -80,7 +82,7 @@ namespace chainbase {
          * This is the preferred index type for objects which need only be referenced by ID, but may be deleted.
          */
         template<class T>
-        struct sparse_index : public generic_index<T, boost::multi_index_container<
+        struct sparse_index : public generic_table<T, boost::multi_index_container<
                 T,
                 indexed_by<
                         hashed_unique <

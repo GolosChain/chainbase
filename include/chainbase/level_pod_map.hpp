@@ -32,16 +32,16 @@ namespace chainbase {
                     opts.comparator = &_comparer;
                     opts.create_if_missing = create;
                     opts.max_open_files = 64;
-                    opts.compression = leveldb::kNoCompression;
+                    opts.compression = rocksdb::kNoCompression;
 
                     if (cache_size > 0) {
                         opts.write_buffer_size =
                                 cache_size / 4; // up to two write buffers may be held in memory simultaneously
-                        _cache.reset(leveldb::NewLRUCache(cache_size / 2));
+                        _cache.reset(rocksdb::NewLRUCache(cache_size / 2));
                         opts.block_cache = _cache.get();
                     }
 
-                    if (ldb::kMajorVersion > 1 || (leveldb::kMajorVersion == 1 && leveldb::kMinorVersion >= 16)) {
+                    if (ldb::kMajorVersion > 1 || (rocksdb::kMajorVersion == 1 && rocksdb::kMinorVersion >= 16)) {
                         // LevelDB versions before 1.16 consider short writes to be corruption. Only trigger error
                         // on corruption in later versions.
                         opts.paranoid_checks = true;
@@ -273,9 +273,9 @@ namespace chainbase {
             }
 
         private:
-            class key_compare : public leveldb::Comparator {
+            class key_compare : public rocksdb::Comparator {
             public:
-                int Compare(const leveldb::Slice &a, const leveldb::Slice &b) const {
+                int Compare(const rocksdb::Slice &a, const rocksdb::Slice &b) const {
                     assert((a.size() == sizeof(Key)) && (b.size() == sizeof(Key)));
                     Key *ak = (Key *) a.data();
                     Key *bk = (Key *) b.data();
@@ -286,13 +286,13 @@ namespace chainbase {
 
                 const char *Name() const { return "key_compare"; }
 
-                void FindShortestSeparator(std::string *, const leveldb::Slice &) const {}
+                void FindShortestSeparator(std::string *, const rocksdb::Slice &) const {}
 
                 void FindShortSuccessor(std::string *) const {};
             };
 
-            std::unique_ptr<leveldb::DB> _db;
-            std::unique_ptr<leveldb::Cache> _cache;
+            std::unique_ptr<rocksdb::DB> _db;
+            std::unique_ptr<rocksdb::Cache> _cache;
             key_compare _comparer;
 
             ldb::ReadOptions _read_options;

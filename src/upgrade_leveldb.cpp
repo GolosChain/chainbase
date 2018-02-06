@@ -6,6 +6,7 @@
 
 #include <chainbase/exception.hpp>
 #include <chainbase/upgrade_leveldb.hpp>
+#include <include/rocksdb/db.h>
 
 namespace chainbase {
     namespace db {
@@ -23,7 +24,7 @@ namespace chainbase {
 
         // this code has no bitshares dependencies, and it
         // could be moved to fc, if fc ever adds a leveldb dependency
-        void try_upgrade_db(const boost::filesystem::path &dir, leveldb::DB *dbase, const char *record_type, size_t record_type_size) {
+        void try_upgrade_db(const boost::filesystem::path &dir, rocksdb::DB *dbase, const char *record_type, size_t record_type_size) {
             size_t old_record_type_size = 0;
             std::string old_record_type;
             boost::filesystem::path record_type_filename = dir / "RECORD_TYPE";
@@ -56,8 +57,7 @@ namespace chainbase {
             }
             if (old_record_type != record_type) {
                 //check if upgrade function in registry
-                auto upgrade_function_itr = upgrade_db_mapper::instance()._upgrade_db_function_registry.find(
-                        old_record_type);
+                auto upgrade_function_itr = upgrade_db_mapper::instance()._upgrade_db_function_registry.find(old_record_type);
                 if (upgrade_function_itr != upgrade_db_mapper::instance()._upgrade_db_function_registry.end()) {
                     //ilog("Upgrading database ${db} from ${old} to ${new}", ("db", dir.preferred_string())("old", old_record_type)("new", record_type));
                     //update database's RECORD_TYPE to new record type name

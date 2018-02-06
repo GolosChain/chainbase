@@ -62,8 +62,10 @@ namespace chainbase {
                     for (const auto &ptr : _objects) {
                         inspector(ptr);
                     }
+                } catch (...) {
+
                 }
-                FC_CAPTURE_AND_RETHROW()
+                //FC_CAPTURE_AND_RETHROW()
             }
 
             class const_iterator {

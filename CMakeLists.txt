@@ -34,7 +34,7 @@ if(APPLE)
 else(APPLE)
     # Linux Specific Options Here
     message(STATUS "Configuring ChainBase on Linux")
-    set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -std=c++11 -Wall")
+    set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -std=c++14 -Wall")
     set(rt_library rt)
     set(pthread_library pthread)
     if(FULL_STATIC_BUILD)
@@ -70,7 +70,7 @@ list(APPEND HEADERS
         include/chainbase/fast_level_map.hpp
         include/chainbase/flat_index.hpp
         include/chainbase/fwd.hpp
-        include/chainbase/generic_index.hpp
+        include/chainbase/generic_table.hpp
         include/chainbase/index.hpp
         include/chainbase/level_map.hpp
         #include/chainbase/level_pod_map.hpp
@@ -80,6 +80,7 @@ list(APPEND HEADERS
         include/chainbase/simple_index.hpp
         include/chainbase/undo_database.hpp
         include/chainbase/upgrade_leveldb.hpp
+        include/chainbase/read_write_mutex_manager.h
 )
 
 list(APPEND SOURCES
@@ -184,21 +185,21 @@ set_property(TARGET rocksdb PROPERTY IMPORTED_LOCATION ${install_dir}/librocksdb
 
 
 
-if(BUILD_SHARED_LIBRARIES)
-    add_library(
-            chainbase SHARED
-            ${HEADERS}
-            ${SOURCES}
-    )
+#if(BUILD_SHARED_LIBRARIES)
+#    add_library(
+#            chainbase SHARED
+#            ${HEADERS}
+#            ${SOURCES}
+#    )
 
-else()
+#else()
     add_library(
             chainbase STATIC
             ${HEADERS}
             ${SOURCES}
     )
 
-endif()
+#endif()
 
 
 
@@ -217,7 +218,6 @@ target_include_directories(
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
         ${Boost_INCLUDE_DIR}
         ${ROCKSDB_INCLUDE_DIR}
-
 )
 
 add_subdirectory(test)
@@ -228,5 +228,6 @@ install(TARGETS
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
-        )
+)
+
 install(FILES ${HEADERS} DESTINATION "include/")

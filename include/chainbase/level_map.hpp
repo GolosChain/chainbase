@@ -2,10 +2,10 @@
 
 #include <fstream>
 
-#include <leveldb/cache.h>
-#include <leveldb/comparator.h>
-#include <leveldb/db.h>
-#include <leveldb/write_batch.h>
+#include <rocksdb/cache.h>
+#include <rocksdb/comparator.h>
+#include <rocksdb/db.h>
+#include <rocksdb/write_batch.h>
 
 #include <chainbase/exception.hpp>
 #include <chainbase/upgrade_leveldb.hpp>
@@ -18,7 +18,7 @@
 namespace chainbase {
     namespace db {
 
-        namespace ldb = leveldb;
+        namespace ldb = rocksdb;
 
         /**
          *  @brief implements a high-level API on top of Level DB that stores items using fc::raw / reflection
@@ -31,22 +31,24 @@ namespace chainbase {
                     assert(!is_open());//, "Database is already open!");
 
                     ldb::Options opts;
-                    opts.comparator = &_comparer;
+                    opts.comparator = &comparer_;
                     opts.create_if_missing = create;
                     opts.max_open_files = 64;
-                    opts.compression = leveldb::kNoCompression;
+                    opts.compression = ldb::kNoCompression;
 
                     if (cache_size > 0) {
                         opts.write_buffer_size = cache_size / 4; // up to two write buffers may be held in memory simultaneously
-                        _cache.reset(leveldb::NewLRUCache(cache_size / 2));
-                        opts.block_cache = _cache.get();
+                        _cache = ldb::NewLRUCache(cache_size / 2);
+                        //opts.block_cache = _cache.get();
                     }
 
-                    if (ldb::kMajorVersion > 1 || (leveldb::kMajorVersion == 1 && leveldb::kMinorVersion >= 16)) {
+/*
+                    if (ldb::kMajorVersion > 1 || (rocksdb::kMajorVersion == 1 && rocksdb::kMinorVersion >= 16)) {
                         // LevelDB versions before 1.16 consider short writes to be corruption. Only trigger error
                         // on corruption in later versions.
                         opts.paranoid_checks = true;
                     }
+*/
 
                     _read_options.verify_checksums = true;
                     _iter_options.verify_checksums = true;
@@ -98,9 +100,10 @@ namespace chainbase {
 
             Value fetch(const Key &k) {
                 try {
+
                     assert(is_open());//, "Database is not open!");
 
-                    std::vector<char> kslice = k.pack();
+                    auto kslice = k.pack();
                     ldb::Slice ks(kslice.data(), kslice.size());
                     std::string value;
                     auto status = _db->Get(_read_options, ks, &value);
@@ -113,7 +116,7 @@ namespace chainbase {
                     }
                     datastream<const char *> ds(value.c_str(), value.size());
                     Value tmp;
-                    fc::raw::unpack(ds, tmp);
+                    //fc::raw::unpack(ds, tmp); TODO:
                     return tmp;
                 } catch (...){
 
@@ -132,14 +135,15 @@ namespace chainbase {
                 Key key() const {
                     Key tmp_key;
                     datastream<const char *> ds2(_it->key().data(), _it->key().size());
-                    fc::raw::unpack(ds2, tmp_key);
+                    //fc::raw::unpack(ds2, tmp_key);TODO
+
                     return tmp_key;
                 }
 
                 Value value() const {
                     Value tmp_val;
                     datastream<const char *> ds(_it->value().data(), _it->value().size());
-                    fc::raw::unpack(ds, tmp_val);
+                    //fc::raw::unpack(ds, tmp_val);TODO
                     return tmp_val;
                 }
 
@@ -202,7 +206,7 @@ namespace chainbase {
                     size_t pack_size = key.pack_size();
                     if (pack_size <= stack_buffer.size()) {
                         datastream<char *> ds(stack_buffer.data, stack_buffer.size());
-                        fc::raw::pack(ds, key);
+                        //fc::raw::serialization(ds, key);TODO:
                         key_slice = ldb::Slice(stack_buffer.data, pack_size);
                     } else {
                         auto kslice = key.pack();
@@ -261,7 +265,7 @@ namespace chainbase {
                         return false;
                     }
                     datastream<const char *> ds2(it->key().data(), it->key().size());
-                    fc::raw::unpack(ds2, k);
+                    //fc::raw::unpack(ds2, k);TODO:
                     return true;
                 } catch (...){
 
@@ -280,10 +284,10 @@ namespace chainbase {
                         return false;
                     }
                     datastream<const char *> ds(it->value().data(), it->value().size());
-                    fc::raw::unpack(ds, v);
+                    //fc::raw::unpack(ds, v);TODO::
 
                     datastream<const char *> ds2(it->key().data(), it->key().size());
-                    fc::raw::unpack(ds2, k);
+                    //fc::raw::unpack(ds2, k);TODO:
                     return true;
                 } catch (...){
 
@@ -302,9 +306,9 @@ namespace chainbase {
              */
             class write_batch {
             private:
-                leveldb::WriteBatch _batch;
+                ldb::WriteBatch _batch;
                 level_map *_map = nullptr;
-                leveldb::WriteOptions _write_options;
+                rocksdb::WriteOptions _write_options;
 
                 friend class level_map;
 
@@ -317,10 +321,10 @@ namespace chainbase {
                     try {
                         commit();
                     }
-                    catch (const fc::canceled_exception &) {
+                    catch (const canceled_exception &) {
                         throw;
                     }
-                    catch (const fc::exception &) {
+                    catch (const std::exception &) {
                         // we're in a destructor, nothing we can do...
                     }
                 }
@@ -334,7 +338,7 @@ namespace chainbase {
                             throw level_map_failure();
                             //FC_THROW_EXCEPTION(level_map_failure, "database error while applying batch: ${msg}", ("msg", status.ToString()));
                         _batch.Clear();
-                    } catch (...){
+                    } catch (...) {
 
                     }
                     //FC_RETHROW_EXCEPTIONS(warn, "error applying batch");
@@ -370,10 +374,10 @@ namespace chainbase {
                 try {
                     assert(is_open());//, "Database is not open!");
 
-                    std::vector<char> kslice = k.pack();
+                    serialize_t kslice = k.serialization();
                     ldb::Slice ks(kslice.data(), kslice.size());
 
-                    //auto vec = v.pack();
+                    //auto vec = v.serialization();
                     ldb::Slice vs(v.data(), v.size());
 
                     auto status = _db->Put(sync ? _sync_options : _write_options, ks, vs);
@@ -404,32 +408,6 @@ namespace chainbase {
                 //FC_RETHROW_EXCEPTIONS(warn, "error removing ${key}", ("key", k));
             }
 
-            void export_to_json(const boost::filesystem::path &path) const {
-                throw std::exception();
-                /*
-                try {
-                    assert(is_open());//, "Database is not open!");
-                    assert(!boost::filesystem::exists(path));
-
-                    std::ofstream fs(path.string());
-                    fs.write("[\n", 2);
-
-                    auto iter = begin();
-                    while (iter.valid()) {
-                        auto str = fc::json::to_pretty_string(std::make_pair(iter.key(), iter.value()));
-                        if ((++iter).valid()) str += ",";
-                        str += "\n";
-                        fs.write(str.c_str(), str.size());
-                    }
-
-                    fs.write("]", 1);
-                } catch (...){
-
-                }
-                //FC_CAPTURE_AND_RETHROW((path))
-                 */
-            }
-
             // note: this loops through all the items in the database, so it's not exactly fast.  it's intended for debugging, nothing else.
             size_t size() const {
                 assert(is_open());//, "Database is not open!");
@@ -444,14 +422,14 @@ namespace chainbase {
             }
 
         private:
-            class key_compare : public leveldb::Comparator {
+            class key_compare : public ldb::Comparator {
             public:
-                int Compare(const leveldb::Slice &a, const leveldb::Slice &b) const {
+                int Compare(const ldb::Slice &a, const ldb::Slice &b) const {
                     Key ak, bk;
                     datastream<const char *> dsa(a.data(), a.size());
-                    fc::raw::unpack(dsa, ak);
+                    //fc::raw::unpack(dsa, ak);TODO:
                     datastream<const char *> dsb(b.data(), b.size());
-                    fc::raw::unpack(dsb, bk);
+                    //fc::raw::unpack(dsb, bk);TODO:
 
                     if (ak < bk) return -1;
                     if (ak == bk) return 0;
@@ -460,20 +438,21 @@ namespace chainbase {
 
                 const char *Name() const { return "key_compare"; }
 
-                void FindShortestSeparator(std::string *, const leveldb::Slice &) const {}
+                void FindShortestSeparator(std::string *, const ldb::Slice &) const {}
 
                 void FindShortSuccessor(std::string *) const {};
             };
 
-            std::unique_ptr<leveldb::DB> _db;
-            std::unique_ptr<leveldb::Cache> _cache;
-            key_compare _comparer;
+            std::unique_ptr<ldb::DB> _db;
+            std::shared_ptr<ldb::Cache> _cache;
+            key_compare comparer_;
 
             ldb::ReadOptions _read_options;
             ldb::ReadOptions _iter_options;
             ldb::WriteOptions _write_options;
             ldb::WriteOptions _sync_options;
         };
+
 
     }
 } // bts::db

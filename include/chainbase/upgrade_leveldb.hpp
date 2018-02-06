@@ -4,6 +4,7 @@
 #include <functional>
 #include <map>
 #include <boost/filesystem/path.hpp>
+#include <include/rocksdb/db.h>
 
 /**
  * This code has no bitshares dependencies, and it
@@ -61,7 +62,7 @@
 
 namespace chainbase { namespace db {
 
-    typedef std::function<void(leveldb::DB*)> upgrade_db_function;
+    typedef std::function<void(rocksdb::DB*)> upgrade_db_function;
 
     class upgrade_db_mapper {
         public:
@@ -72,9 +73,9 @@ namespace chainbase { namespace db {
     };
 
     #define REGISTER_DB_OBJECT(TYPE,VERSIONNUM) \
-        void UpgradeDb ## TYPE ## VERSIONNUM(leveldb::DB* dbase) \
+        void UpgradeDb ## TYPE ## VERSIONNUM(rocksdb::DB* dbase) \
         { \
-          std::unique_ptr<leveldb::Iterator> dbase_itr( dbase->NewIterator(leveldb::ReadOptions()) ); \
+          std::unique_ptr<rocksdb::Iterator> dbase_itr( dbase->NewIterator(rocksdb::ReadOptions()) ); \
           dbase_itr->SeekToFirst(); \
           if( dbase_itr->status().IsNotFound() ) /*if empty database, do nothing*/ \
             return; \
@@ -86,10 +87,10 @@ namespace chainbase { namespace db {
             datastream<const char*> dstream( dbase_itr->value().data(), dbase_itr->value().size() ); \
             fc::raw::unpack( dstream, old_value ); \
             TYPE new_value(old_value);       /*convert to new record type*/ \
-            leveldb::Slice key_slice = dbase_itr->key(); \
+            rocksdb::Slice key_slice = dbase_itr->key(); \
             auto vec = fc::raw::pack(new_value); \
-            leveldb::Slice value_slice( vec.data(), vec.size() ); \
-            auto status = dbase->Put( leveldb::WriteOptions(), key_slice, value_slice ); \
+            rocksdb::Slice value_slice( vec.data(), vec.size() ); \
+            auto status = dbase->Put( rocksdb::WriteOptions(), key_slice, value_slice ); \
             if( !status.ok() ) \
             { \
               FC_THROW_EXCEPTION( exception, "database error: ${msg}", ("msg", status.ToString() ) ); \
@@ -100,6 +101,6 @@ namespace chainbase { namespace db {
         static int dummyResult ## TYPE ## VERSIONNUM  = \
           upgrade_db_mapper::instance()->add_type(fc::get_typename<TYPE ## VERSIONNUM>::name(), UpgradeDb ## TYPE ## VERSIONNUM);
 
-    void try_upgrade_db( const boost::filesystem::path& dir, leveldb::DB* dbase, const char* record_type, size_t record_type_size );
+    void try_upgrade_db( const boost::filesystem::path& dir, rocksdb::DB* dbase, const char* record_type, size_t record_type_size );
 
 } } // namespace db

@@ -53,9 +53,9 @@ namespace chainbase {
 
             virtual void move_from(object &obj) = 0;
 
-            virtual /*variant*/ std::string to_variant() const = 0;
+            virtual bool deserialization(serialize_t&&) const = 0;
 
-            virtual std::vector<char> pack() const = 0;
+            virtual serialize_t serialization() const = 0;
         };
 
         /**
@@ -76,13 +76,15 @@ namespace chainbase {
                 static_cast<DerivedClass &>(*this) = std::move(static_cast<DerivedClass &>(obj));
             }
 
-            virtual /*variant*/std::string to_variant() const {
-                return std::string(); //variant(static_cast<const DerivedClass &>(*this));
+            virtual bool deserialization(serialize_t&& object_) const {
+                return static_cast<const DerivedClass *>(this)->deserialization(std::move(object_));
             }
 
-            virtual std::vector<char> pack() const {
-                return std::vector<char>();//fc::raw::pack(static_cast<const DerivedClass &>(*this));
+            virtual serialize_t serialization() const {
+                return static_cast<const DerivedClass *>(this)->serialization();
             }
+
+
         };
 
         /**

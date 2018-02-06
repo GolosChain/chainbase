@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
 namespace chainbase {
     namespace db {
@@ -13,5 +14,6 @@ namespace chainbase {
 
         typedef std::shared_ptr<peer_ram> peer_ram_ptr;
 
+        using serialize_t = std::string ;
     }
 } // namespace chainbase::db

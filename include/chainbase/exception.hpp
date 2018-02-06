@@ -1,5 +1,6 @@
 #pragma once
-namespace chainbase { namespace db {
+namespace chainbase {
+    namespace db {
 
         class level_map_failure : public  std::exception{
         };
@@ -22,5 +23,10 @@ namespace chainbase { namespace db {
 
         };
 
-        
-} } // bts::db
+
+        class canceled_exception : public std::exception{
+
+        };
+
+    }
+}

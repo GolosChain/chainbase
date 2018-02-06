@@ -1,8 +1,10 @@
 #pragma once
 
+#include <string>
 #include <memory>
 #include <cstdint>
 #include <vector>
+#include "fwd.hpp"
 #define BTS_DB_MAX_INSTANCE_ID  (uint64_t(-1)>>16)
 
 namespace chainbase {
@@ -52,9 +54,11 @@ namespace chainbase {
                 return a.number < b.number;
             }
 
-            std::vector<char> pack() const {
-                //TODO: big problem
-                return std::vector<char>();//std::to_string(space()) + "." + std::to_string(type()) + "." + std::to_string(instance());
+            serialize_t serialization() const {
+
+                serialize_t tmp;
+                tmp = std::to_string(space()) + "." + std::to_string(type()) + "." + std::to_string(instance());
+                return tmp;
 
             }
 

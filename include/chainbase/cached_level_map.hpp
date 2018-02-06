@@ -4,8 +4,8 @@
 #include <set>
 
 #include <boost/optional.hpp>
-
 #include <chainbase/level_map.hpp>
+
 namespace chainbase { namespace db {
 
    template<typename Key, typename Value, class CacheType = std::map<Key,Value>>

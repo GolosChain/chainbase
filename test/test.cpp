@@ -2,7 +2,7 @@
 
 #include <boost/test/unit_test.hpp>
 
-#include <chainbase/database.hpp>
+#include <chainbase/object_database.hpp>
 #include <chainbase/object.hpp>
 
 #include <boost/multi_index_container.hpp>

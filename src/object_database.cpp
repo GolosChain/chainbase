@@ -10,7 +10,7 @@ namespace chainbase {
             _index.resize(255);
             _undo_db.enable();
 
-            _object_id_to_object = std::make_shared<db::level_map<object_id_type, vector<char>>>();
+            _object_id_to_object = std::make_shared<db::level_map<object_id_type, std::string>>();
         }
 
         object_database::~object_database() {}
@@ -56,11 +56,11 @@ namespace chainbase {
                 for (const unique_ptr<index> &type_index : space)
                     if (type_index) {
                         type_index->inspect_all_objects([&](const object &obj) {
-                            _object_id_to_object->store(obj.id, obj.pack());
+                            _object_id_to_object->store(obj.id, obj.serialization());
                         });
                         next_ids.push_back(type_index->get_next_id());
                     }
-            _object_id_to_object->store(object_id_type(), fc::raw::pack(next_ids));
+            _object_id_to_object->store(object_id_type(), fc::raw::serialization(next_ids));TODO
         }
 
         void object_database::wipe(const boost::filesystem::path &data_dir) {
@@ -86,14 +86,17 @@ namespace chainbase {
                 try {
                     auto next_ids = fc::raw::unpack<vector<object_id_type>>(_object_id_to_object->fetch(object_id_type()));
                     //wdump((next_ids));
+
                     for (auto id : next_ids) {
                         try {
                             get_mutable_index(id).set_next_id(id);
                         }catch(...) {
+
                         }//FC_CAPTURE_AND_RETHROW((id));
                     }
+
                 }
-                catch (...){//const fc::exception &e) {
+                catch (const std::exception &e) {
                     // dlog( "unable to fetch next ids, must be new object_database\n ${e}", ("e",e.to_detail_string()) );
                 }
 
@@ -101,7 +104,7 @@ namespace chainbase {
             }catch (...){
 
             }
-            //FC_CAPTURE_AND_RETHROW((data_dir))
+            //FC_CAPTURE_AND_RETHROW((data_dir))TODO
         }
 
 
@@ -111,7 +114,7 @@ namespace chainbase {
             } catch (...) {
 
             }
-            //FC_CAPTURE_AND_RETHROW()
+            //FC_CAPTURE_AND_RETHROW()TODO
         }
 
         void object_database::save_undo(const object &obj) {
@@ -125,6 +128,15 @@ namespace chainbase {
         void object_database::save_undo_remove(const object &obj) {
             _undo_db.on_remove(obj);
         }
+
+        void object_database::reset_indexes() {
+            _index.clear();
+            _index.resize(255);
+        }
+
+        boost::filesystem::path object_database::get_data_dir() const { return _data_dir; }
+
+        const object &object_database::insert(object &&obj) { return get_mutable_index(obj.id).insert(std::move(obj)); }
 
 
     }

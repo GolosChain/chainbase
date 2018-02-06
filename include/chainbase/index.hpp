@@ -7,6 +7,7 @@
 
 namespace chainbase {
     namespace db {
+        using db_type = shared_ptr<level_map<object_id_type, std::string >>;
         class object_database;
 
         /**
@@ -74,9 +75,7 @@ namespace chainbase {
             /**
              *  Opens the index loading objects from a level_db database
              */
-            virtual void open(
-                    const shared_ptr<chainbase::db::level_map < object_id_type, vector<char> >> & db
-            ){}
+            virtual void open(const db_type &db) {}
 
             /** @return the object with id or nullptr if not found */
             virtual const object *find(object_id_type id) const = 0;
@@ -149,7 +148,7 @@ namespace chainbase {
         template<typename DerivedIndex>
         class primary_index : public DerivedIndex, public base_primary_index {
         public:
-            typedef typename DerivedIndex::object_type object_type;
+            using object_type =  typename DerivedIndex::object_type;
 
             primary_index(object_database &db)
                     : base_primary_index(db), _next_id(object_type::space_id, object_type::type_id, 0) {}
@@ -165,13 +164,14 @@ namespace chainbase {
             virtual void set_next_id(object_id_type id) { _next_id = id; }
 
             virtual const object &load(const std::vector<char> &data) {
-                return DerivedIndex::insert(object_type.unpack(data));
+                object_type tmp;
+                 //TODO!!
+                auto tmp1=&tmp;
+                tmp1->unpack(data);
+                return DerivedIndex::insert(tmp);
             }
 
-            virtual void open(
-                    const shared_ptr<chainbase::db::level_map < object_id_type,
-                    vector<char> >>& db
-            ){
+            virtual void open(const db_type &db) {
                 auto first = object_id_type(DerivedIndex::object_type::space_id, DerivedIndex::object_type::type_id, 0);
                 auto last = object_id_type(DerivedIndex::object_type::space_id, DerivedIndex::object_type::type_id + 1, 0);
                 auto itr = db->lower_bound(first);
