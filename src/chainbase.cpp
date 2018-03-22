@@ -86,17 +86,11 @@ namespace chainbase {
         if (boost::filesystem::exists(abs_path)) {
             _meta.reset(new boost::interprocess::managed_mapped_file(boost::interprocess::open_only, abs_path.generic_string().c_str()
             ));
-
-            _rw_manager = _meta->find<read_write_mutex_manager>("rw_manager").first;
-            if (!_rw_manager)
-                BOOST_THROW_EXCEPTION(std::runtime_error("could not find read write lock manager"));
         } else {
             _meta.reset(new boost::interprocess::managed_mapped_file(boost::interprocess::create_only,
                     abs_path.generic_string().c_str(),
                     sizeof(read_write_mutex_manager) * 2
             ));
-
-            _rw_manager = _meta->find_or_construct<read_write_mutex_manager>("rw_manager")();
         }
 
         if (write) {

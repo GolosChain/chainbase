@@ -1159,7 +1159,7 @@ namespace chainbase {
 
         template<typename Lambda>
         auto with_read_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(Lambda * )nullptr)()) {
-            read_lock lock(_rw_manager->current_lock(), boost::interprocess::defer_lock_type());
+            read_lock lock(_mutex, boost::interprocess::defer_lock_type());
 #ifdef CHAINBASE_CHECK_LOCKING
             BOOST_ATTRIBUTE_UNUSED
             int_incrementer ii(_read_lock_count);
@@ -1168,9 +1168,13 @@ namespace chainbase {
             if (!wait_micro) {
                 lock.lock();
             } else {
+                auto lock_time =
+                    boost::posix_time::microsec_clock::universal_time() +
+                    boost::posix_time::microseconds(wait_micro);
 
-                if (!lock.timed_lock(boost::posix_time::microsec_clock::universal_time() + boost::posix_time::microseconds(wait_micro)))
+                if (!lock.timed_lock(lock_time)) {
                     BOOST_THROW_EXCEPTION(std::runtime_error("unable to acquire lock"));
+                }
             }
 
             return callback();
@@ -1181,7 +1185,7 @@ namespace chainbase {
             if (_read_only)
                 BOOST_THROW_EXCEPTION(std::logic_error("cannot acquire write lock on read-only process"));
 
-            write_lock lock(_rw_manager->current_lock(), boost::defer_lock_t());
+            write_lock lock(_mutex, boost::defer_lock_t());
 #ifdef CHAINBASE_CHECK_LOCKING
             BOOST_ATTRIBUTE_UNUSED
             int_incrementer ii(_write_lock_count);
@@ -1190,11 +1194,14 @@ namespace chainbase {
             if (!wait_micro) {
                 lock.lock();
             } else {
-                while (!lock.timed_lock(boost::posix_time::microsec_clock::universal_time() +
-                                        boost::posix_time::microseconds(wait_micro))) {
-                    _rw_manager->next_lock();
-                    std::cerr << "Lock timeout, moving to lock " << _rw_manager->current_lock_num() << std::endl;
-                    lock = write_lock(_rw_manager->current_lock(), boost::defer_lock_t());
+                auto lock_time = [&] {
+                    return
+                        boost::posix_time::microsec_clock::universal_time() +
+                        boost::posix_time::microseconds(wait_micro);
+                };
+
+                while (!lock.timed_lock(lock_time())) {
+                    std::cerr << "Lock timeout" << std::endl;
                 }
             }
 
@@ -1204,7 +1211,7 @@ namespace chainbase {
     private:
         boost::interprocess::unique_ptr<boost::interprocess::managed_mapped_file> _segment;
         boost::interprocess::unique_ptr<boost::interprocess::managed_mapped_file> _meta;
-        read_write_mutex_manager *_rw_manager = nullptr;
+        read_write_mutex _mutex;
         bool _read_only = false;
         boost::interprocess::file_lock _flock;
 
