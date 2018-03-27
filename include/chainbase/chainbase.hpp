@@ -1168,12 +1168,14 @@ namespace chainbase {
             if (!wait_micro) {
                 lock.lock();
             } else {
-                auto lock_time =
-                    boost::posix_time::microsec_clock::universal_time() +
-                    boost::posix_time::microseconds(wait_micro);
+                auto lock_time = [&] {
+                    return
+                        boost::posix_time::microsec_clock::universal_time() +
+                        boost::posix_time::microseconds(wait_micro);
+                };
 
-                if (!lock.timed_lock(lock_time)) {
-                    BOOST_THROW_EXCEPTION(std::runtime_error("unable to acquire lock"));
+                while (!lock.timed_lock(lock_time())) {
+                    std::cerr << "Read lock timeout" << std::endl;
                 }
             }
 
@@ -1201,7 +1203,7 @@ namespace chainbase {
                 };
 
                 while (!lock.timed_lock(lock_time())) {
-                    std::cerr << "Lock timeout" << std::endl;
+                    std::cerr << "Write lock timeout" << std::endl;
                 }
             }
 
