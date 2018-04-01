@@ -1195,7 +1195,11 @@ namespace chainbase {
         }
 
         template<typename Lambda>
-        auto with_write_lock(Lambda &&callback) -> decltype((*(Lambda * )nullptr)()) {
+        auto with_write_lock(
+            uint64_t write_wait_micro,
+            uint32_t max_write_wait_retries,
+            Lambda &&callback
+        ) -> decltype((*(Lambda * )nullptr)()) {
             if (_read_only)
                 BOOST_THROW_EXCEPTION(std::logic_error("cannot acquire write lock on read-only process"));
 
@@ -1205,13 +1209,13 @@ namespace chainbase {
             int_incrementer ii(_write_lock_count);
 #endif
 
-            if (!_write_wait_micro || !_max_write_wait_retries) {
+            if (!write_wait_micro || !max_write_wait_retries) {
                 lock.lock();
             } else {
                 auto lock_time = [&] {
                     return
                         boost::posix_time::microsec_clock::universal_time() +
-                        boost::posix_time::microseconds(_write_wait_micro);
+                        boost::posix_time::microseconds(write_wait_micro);
                 };
 
                 for (uint32_t retry = 0; ; ++retry) {
@@ -1219,7 +1223,7 @@ namespace chainbase {
                         break;
                     }
 
-                    if (retry >= _max_write_wait_retries) {
+                    if (retry >= max_write_wait_retries) {
                         std::cerr << "FATAL write lock timeout!!!" << std::endl;
                         BOOST_THROW_EXCEPTION(std::runtime_error("Unable to acquire WRITE lock"));
                     } else {
@@ -1229,6 +1233,16 @@ namespace chainbase {
             }
 
             return callback();
+        }
+
+        template<typename Lambda>
+        auto with_weak_write_lock(Lambda &&callback) -> decltype((*(Lambda * )nullptr)()) {
+            return with_write_lock(_write_wait_micro, _max_write_wait_retries, std::forward<Lambda>(callback));
+        }
+
+        template<typename Lambda>
+        auto with_strong_write_lock(Lambda &&callback) -> decltype((*(Lambda * )nullptr)()) {
+            return with_write_lock(uint64_t(1000000), uint32_t(100000), std::forward<Lambda>(callback));
         }
 
         void read_wait_micro(uint64_t value);
