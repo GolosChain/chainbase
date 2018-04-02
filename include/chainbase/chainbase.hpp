@@ -75,8 +75,8 @@ namespace chainbase {
         }
     };
 
-    typedef boost::interprocess::interprocess_sharable_mutex read_write_mutex;
-    typedef boost::interprocess::sharable_lock<read_write_mutex> read_lock;
+    typedef boost::shared_mutex read_write_mutex;
+    typedef boost::shared_lock<read_write_mutex> read_lock;
     typedef boost::unique_lock<read_write_mutex> write_lock;
 
     /**
@@ -1161,24 +1161,33 @@ namespace chainbase {
         }
 
         template<typename Lambda>
-        auto with_read_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(Lambda * )nullptr)()) {
-            read_lock lock(_mutex, boost::interprocess::defer_lock_type());
+        auto with_read_lock(Lambda &&callback) -> decltype((*(Lambda * )nullptr)()) {
+            read_lock lock(_mutex, boost::defer_lock_t());
 #ifdef CHAINBASE_CHECK_LOCKING
             BOOST_ATTRIBUTE_UNUSED
             int_incrementer ii(_read_lock_count);
 #endif
 
-            if (!wait_micro) {
+            if (!_read_wait_micro || !_max_read_wait_retries) {
                 lock.lock();
             } else {
                 auto lock_time = [&] {
                     return
                         boost::posix_time::microsec_clock::universal_time() +
-                        boost::posix_time::microseconds(wait_micro);
+                        boost::posix_time::microseconds(_read_wait_micro);
                 };
 
-                while (!lock.timed_lock(lock_time())) {
-                    std::cerr << "Read lock timeout" << std::endl;
+                for (uint32_t retry = 0; ; ++retry) {
+                    if (lock.timed_lock(lock_time())) {
+                        break;
+                    }
+
+                    if (retry >= _max_read_wait_retries) {
+                        std::cerr << "No more retries for read lock" << std::endl;
+                        BOOST_THROW_EXCEPTION(std::runtime_error("Unable to acquire READ lock"));
+                    } else {
+                        std::cerr << "Read lock timeout" << std::endl;
+                    }
                 }
             }
 
@@ -1186,7 +1195,11 @@ namespace chainbase {
         }
 
         template<typename Lambda>
-        auto with_write_lock(Lambda &&callback, uint64_t wait_micro = 1000000) -> decltype((*(Lambda * )nullptr)()) {
+        auto with_write_lock(
+            uint64_t write_wait_micro,
+            uint32_t max_write_wait_retries,
+            Lambda &&callback
+        ) -> decltype((*(Lambda * )nullptr)()) {
             if (_read_only)
                 BOOST_THROW_EXCEPTION(std::logic_error("cannot acquire write lock on read-only process"));
 
@@ -1196,22 +1209,53 @@ namespace chainbase {
             int_incrementer ii(_write_lock_count);
 #endif
 
-            if (!wait_micro) {
+            if (!write_wait_micro || !max_write_wait_retries) {
                 lock.lock();
             } else {
                 auto lock_time = [&] {
                     return
                         boost::posix_time::microsec_clock::universal_time() +
-                        boost::posix_time::microseconds(wait_micro);
+                        boost::posix_time::microseconds(write_wait_micro);
                 };
 
-                while (!lock.timed_lock(lock_time())) {
-                    std::cerr << "Write lock timeout" << std::endl;
+                for (uint32_t retry = 0; ; ++retry) {
+                    if (lock.timed_lock(lock_time())) {
+                        break;
+                    }
+
+                    if (retry >= max_write_wait_retries) {
+                        std::cerr << "FATAL write lock timeout!!!" << std::endl;
+                        BOOST_THROW_EXCEPTION(std::runtime_error("Unable to acquire WRITE lock"));
+                    } else {
+                        std::cerr << "Write lock timeout" << std::endl;
+                    }
                 }
             }
 
             return callback();
         }
+
+        template<typename Lambda>
+        auto with_weak_write_lock(Lambda &&callback) -> decltype((*(Lambda * )nullptr)()) {
+            return with_write_lock(_write_wait_micro, _max_write_wait_retries, std::forward<Lambda>(callback));
+        }
+
+        template<typename Lambda>
+        auto with_strong_write_lock(Lambda &&callback) -> decltype((*(Lambda * )nullptr)()) {
+            return with_write_lock(uint64_t(1000000), uint32_t(100000), std::forward<Lambda>(callback));
+        }
+
+        void read_wait_micro(uint64_t value);
+        uint64_t read_wait_micro() const;
+
+        void max_read_wait_retries(uint32_t value);
+        uint32_t max_read_wait_retries() const;
+
+        void write_wait_micro(uint64_t value);
+        uint64_t write_wait_micro() const;
+
+        void max_write_wait_retries(uint32_t value);
+        uint32_t max_write_wait_retries() const;
 
     private:
         boost::interprocess::unique_ptr<boost::interprocess::managed_mapped_file> _segment;
@@ -1235,6 +1279,12 @@ namespace chainbase {
         int32_t _read_lock_count = 0;
         int32_t _write_lock_count = 0;
         bool _enable_require_locking = false;
+
+        uint64_t _read_wait_micro = 500000;
+        uint32_t _max_read_wait_retries = 3;
+
+        uint64_t _write_wait_micro = 500000;
+        uint32_t _max_write_wait_retries = 3;
     };
 
     template<typename Object, typename... Args> using shared_multi_index_container = boost::multi_index_container<

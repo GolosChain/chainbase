@@ -5,6 +5,7 @@
 
 namespace chainbase {
 
+
     struct environment_check {
         environment_check() {
             memset(&compiler_version, 0, sizeof(compiler_version));
@@ -178,6 +179,38 @@ namespace chainbase {
         } else {
             return session();
         }
+    }
+
+    void database::read_wait_micro(uint64_t value) {
+        _read_wait_micro = value;
+    }
+
+    uint64_t database::read_wait_micro() const {
+        return _read_wait_micro;
+    }
+
+    void database::max_read_wait_retries(uint32_t value) {
+        _max_read_wait_retries = value;
+    }
+
+    uint32_t database::max_read_wait_retries() const {
+        return _max_read_wait_retries;
+    };
+
+    void database::write_wait_micro(uint64_t value) {
+        _write_wait_micro = value;
+    }
+
+    uint64_t database::write_wait_micro() const {
+        return _write_wait_micro;
+    }
+
+    void database::max_write_wait_retries(uint32_t value) {
+        _max_write_wait_retries = value;
+    }
+
+    uint32_t database::max_write_wait_retries() const {
+        return _max_write_wait_retries;
     }
 
 }  // namespace chainbase
