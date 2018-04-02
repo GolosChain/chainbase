@@ -1280,11 +1280,11 @@ namespace chainbase {
         int32_t _write_lock_count = 0;
         bool _enable_require_locking = false;
 
-        uint64_t _read_wait_micro = 1000000;
-        uint32_t _max_read_wait_retries = 5;
+        uint64_t _read_wait_micro = 500000;
+        uint32_t _max_read_wait_retries = 3;
 
-        uint64_t _write_wait_micro = 1000000;
-        uint32_t _max_write_wait_retries = 10000;
+        uint64_t _write_wait_micro = 500000;
+        uint32_t _max_write_wait_retries = 3;
     };
 
     template<typename Object, typename... Args> using shared_multi_index_container = boost::multi_index_container<
