@@ -33,7 +33,7 @@ namespace chainbase {
         bool windows = false;
     };
 
-    void database::open(const boost::filesystem::path &dir, uint32_t flags, uint64_t shared_file_size) {
+    void database::open(const boost::filesystem::path &dir, uint32_t flags, size_t shared_file_size) {
 
         bool write = flags & database::read_write;
 
@@ -53,11 +53,14 @@ namespace chainbase {
 
         if (boost::filesystem::exists(abs_path)) {
             if (write) {
-                auto existing_file_size = boost::filesystem::file_size(abs_path);
-                if (shared_file_size > existing_file_size) {
-                    if (!boost::interprocess::managed_mapped_file::grow(abs_path.generic_string().c_str(),
-                            shared_file_size - existing_file_size))
+                _file_size = boost::filesystem::file_size(abs_path);
+                if (shared_file_size > _file_size) {
+                    if (!boost::interprocess::managed_mapped_file::grow(
+                            abs_path.generic_string().c_str(), shared_file_size - _file_size)
+                    ) {
                         BOOST_THROW_EXCEPTION(std::runtime_error("could not grow database file to requested size."));
+                    }
+                    _file_size = shared_file_size;
                 }
 
                 _segment.reset(new boost::interprocess::managed_mapped_file(boost::interprocess::open_only,
@@ -68,6 +71,7 @@ namespace chainbase {
                         abs_path.generic_string().c_str()
                 ));
                 _read_only = true;
+                _file_size = shared_file_size;
             }
 
             auto env = _segment->find<environment_check>("environment");
@@ -79,8 +83,8 @@ namespace chainbase {
                     abs_path.generic_string().c_str(), shared_file_size
             ));
             _segment->find_or_construct<environment_check>("environment")();
+            _file_size = shared_file_size;
         }
-
 
         abs_path = boost::filesystem::absolute(dir / "shared_memory.meta");
 
@@ -124,6 +128,25 @@ namespace chainbase {
         _data_dir = boost::filesystem::path();
         _index_list.clear();
         _index_map.clear();
+        _index_types.clear();
+    }
+
+    void database::resize(size_t new_shared_file_size) {
+        if (_undo_session_count) {
+            BOOST_THROW_EXCEPTION(std::runtime_error("Cannot resize shared memory file while undo session is active"));
+        }
+
+        _segment.reset();
+        _meta.reset();
+
+        open(_data_dir, database::read_write, new_shared_file_size);
+
+        _index_list.clear();
+        _index_map.clear();
+
+        for (auto &index_type: _index_types) {
+            index_type->add_index(*this);
+        }
     }
 
     void database::set_require_locking(bool enable_require_locking) {
@@ -168,17 +191,13 @@ namespace chainbase {
         }
     }
 
-    database::session database::start_undo_session(bool enabled) {
-        if (enabled) {
-            std::vector<boost::interprocess::unique_ptr<abstract_session>> _sub_sessions;
-            _sub_sessions.reserve(_index_list.size());
-            for (auto &item : _index_list) {
-                _sub_sessions.push_back(item->start_undo_session(enabled));
-            }
-            return session(std::move(_sub_sessions));
-        } else {
-            return session();
+    database::session database::start_undo_session() {
+        std::vector<boost::interprocess::unique_ptr<abstract_session>> sub_sessions;
+        sub_sessions.reserve(_index_list.size());
+        for (auto &item : _index_list) {
+            sub_sessions.push_back(item->start_undo_session());
         }
+        return session(std::move(sub_sessions), _undo_session_count);
     }
 
     void database::read_wait_micro(uint64_t value) {
