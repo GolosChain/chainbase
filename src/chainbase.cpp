@@ -21,7 +21,7 @@ namespace chainbase {
 #endif
         }
 
-        friend bool operator==(const environment_check &a, const environment_check &b) {
+        friend bool operator==(const environment_check& a, const environment_check& b) {
             return std::make_tuple(a.compiler_version, a.debug, a.apple, a.windows)
                    ==
                    std::make_tuple(b.compiler_version, b.debug, b.apple, b.windows);
@@ -33,14 +33,14 @@ namespace chainbase {
         bool windows = false;
     };
 
-    void database::open(const boost::filesystem::path &dir, uint32_t flags, size_t shared_file_size) {
+    void database::open(const boost::filesystem::path& dir, uint32_t flags, size_t shared_file_size) {
 
         bool write = flags & database::read_write;
 
         if (!boost::filesystem::exists(dir)) {
-            if (!write)
-                BOOST_THROW_EXCEPTION(std::runtime_error(
-                        "database file not found at " + dir.native()));
+            if (!write) {
+                BOOST_THROW_EXCEPTION(std::runtime_error("database file not found at " + dir.native()));
+            }
         }
 
         boost::filesystem::create_directories(dir);
@@ -64,11 +64,11 @@ namespace chainbase {
                 }
 
                 _segment.reset(new boost::interprocess::managed_mapped_file(boost::interprocess::open_only,
-                        abs_path.generic_string().c_str()
+                    abs_path.generic_string().c_str()
                 ));
             } else {
                 _segment.reset(new boost::interprocess::managed_mapped_file(boost::interprocess::open_read_only,
-                        abs_path.generic_string().c_str()
+                    abs_path.generic_string().c_str()
                 ));
                 _read_only = true;
                 _file_size = shared_file_size;
@@ -80,28 +80,17 @@ namespace chainbase {
             }
         } else {
             _segment.reset(new boost::interprocess::managed_mapped_file(boost::interprocess::create_only,
-                    abs_path.generic_string().c_str(), shared_file_size
+                abs_path.generic_string().c_str(), shared_file_size
             ));
             _segment->find_or_construct<environment_check>("environment")();
             _file_size = shared_file_size;
         }
 
-        abs_path = boost::filesystem::absolute(dir / "shared_memory.meta");
-
-        if (boost::filesystem::exists(abs_path)) {
-            _meta.reset(new boost::interprocess::managed_mapped_file(boost::interprocess::open_only, abs_path.generic_string().c_str()
-            ));
-        } else {
-            _meta.reset(new boost::interprocess::managed_mapped_file(boost::interprocess::create_only,
-                    abs_path.generic_string().c_str(),
-                    sizeof(read_write_mutex_manager) * 2
-            ));
-        }
-
         if (write) {
             _flock = boost::interprocess::file_lock(abs_path.generic_string().c_str());
-            if (!_flock.try_lock())
+            if (!_flock.try_lock()) {
                 BOOST_THROW_EXCEPTION(std::runtime_error("could not gain write access to the shared memory file"));
+            }
         }
     }
 
@@ -109,22 +98,16 @@ namespace chainbase {
         if (_segment) {
             _segment->flush();
         }
-        if (_meta) {
-            _meta->flush();
-        }
     }
 
     void database::close() {
         _segment.reset();
-        _meta.reset();
         _data_dir = boost::filesystem::path();
     }
 
-    void database::wipe(const boost::filesystem::path &dir) {
+    void database::wipe(const boost::filesystem::path& dir) {
         _segment.reset();
-        _meta.reset();
         boost::filesystem::remove_all(dir / "shared_memory.bin");
-        boost::filesystem::remove_all(dir / "shared_memory.meta");
         _data_dir = boost::filesystem::path();
         _index_list.clear();
         _index_map.clear();
@@ -132,24 +115,23 @@ namespace chainbase {
     }
 
     void database::resize(size_t new_shared_file_size) {
-        if (_undo_session_count) {
+        if (_undo_session_count.load(std::memory_order_acquire) != 0) {
             BOOST_THROW_EXCEPTION(std::runtime_error("Cannot resize shared memory file while undo session is active"));
         }
 
         _segment.reset();
-        _meta.reset();
 
         open(_data_dir, database::read_write, new_shared_file_size);
 
         _index_list.clear();
         _index_map.clear();
 
-        for (auto &index_type: _index_types) {
+        for (auto& index_type: _index_types) {
             index_type->add_index(*this);
         }
     }
 
-    void database::set_require_locking(bool enable_require_locking) {
+    void database::require_locking(bool enable_require_locking) {
 #ifdef CHAINBASE_CHECK_LOCKING
         _enable_require_locking = enable_require_locking;
 #endif
@@ -157,10 +139,10 @@ namespace chainbase {
 
 #ifdef CHAINBASE_CHECK_LOCKING
 
-    void database::require_lock_fail(const char *method, const char *lock_type, const char *tname) const {
+    void database::require_lock_fail(const char* method, const char* lock_type, const char* tname) const {
         std::string err_msg =
-                "database::" + std::string(method) + " require_" + std::string(lock_type) + "_lock() failed on type " +
-                std::string(tname);
+            "database::" + std::string(method) + " require_" + std::string(lock_type) + "_lock() failed on type " +
+            std::string(tname);
         std::cerr << err_msg << std::endl;
         BOOST_THROW_EXCEPTION(std::runtime_error( err_msg ));
     }
@@ -168,25 +150,25 @@ namespace chainbase {
 #endif
 
     void database::undo() {
-        for (auto &item : _index_list) {
+        for (auto& item : _index_list) {
             item->undo();
         }
     }
 
     void database::squash() {
-        for (auto &item : _index_list) {
+        for (auto& item : _index_list) {
             item->squash();
         }
     }
 
     void database::commit(int64_t revision) {
-        for (auto &item : _index_list) {
+        for (auto& item : _index_list) {
             item->commit(revision);
         }
     }
 
     void database::undo_all() {
-        for (auto &item : _index_list) {
+        for (auto& item : _index_list) {
             item->undo_all();
         }
     }
@@ -194,7 +176,7 @@ namespace chainbase {
     database::session database::start_undo_session() {
         std::vector<boost::interprocess::unique_ptr<abstract_session>> sub_sessions;
         sub_sessions.reserve(_index_list.size());
-        for (auto &item : _index_list) {
+        for (auto& item : _index_list) {
             sub_sessions.push_back(item->start_undo_session());
         }
         return session(std::move(sub_sessions), _undo_session_count);
