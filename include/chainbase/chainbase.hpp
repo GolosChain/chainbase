@@ -1055,20 +1055,24 @@ namespace chainbase {
         }
 
         template<typename Lambda>
-        auto with_read_lock(Lambda&& callback) -> decltype((*(Lambda * )nullptr)()) {
+        auto with_read_lock(
+            uint64_t read_wait_micro,
+            uint32_t max_read_wait_retries,
+            Lambda&& callback
+        ) -> decltype((*(Lambda * )nullptr)()) {
             read_lock lock(_mutex, boost::defer_lock_t());
 #ifdef CHAINBASE_CHECK_LOCKING
             BOOST_ATTRIBUTE_UNUSED
             int_incrementer ii(_read_lock_count);
 #endif
 
-            if (!_read_wait_micro || !_max_read_wait_retries) {
+            if (!read_wait_micro || !max_read_wait_retries) {
                 lock.lock();
             } else {
                 auto lock_time = [&] {
                     return
                         boost::posix_time::microsec_clock::universal_time() +
-                        boost::posix_time::microseconds(_read_wait_micro);
+                        boost::posix_time::microseconds(read_wait_micro);
                 };
 
                 for (uint32_t retry = 0; ; ++retry) {
@@ -1076,7 +1080,7 @@ namespace chainbase {
                         break;
                     }
 
-                    if (retry >= _max_read_wait_retries) {
+                    if (retry >= max_read_wait_retries) {
                         std::cerr << "No more retries for read lock" << std::endl;
                         BOOST_THROW_EXCEPTION(std::runtime_error("Unable to acquire READ lock"));
                     } else {
@@ -1086,6 +1090,16 @@ namespace chainbase {
             }
 
             return callback();
+        }
+
+        template<typename Lambda>
+        auto with_weak_read_lock(Lambda&& callback) -> decltype((*(Lambda*)nullptr)()) {
+            return with_read_lock(_read_wait_micro, _max_read_wait_retries, std::forward<Lambda>(callback));
+        }
+
+        template<typename Lambda>
+        auto with_strong_read_lock(Lambda&& callback) -> decltype((*(Lambda*)nullptr)()) {
+            return with_read_lock(uint64_t(1000000), uint32_t(100000), std::forward<Lambda>(callback));
         }
 
         template<typename Lambda>
