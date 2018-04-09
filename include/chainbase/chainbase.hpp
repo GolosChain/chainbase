@@ -272,6 +272,10 @@ namespace chainbase {
             }
         }
 
+        std::string name() const {
+            return boost::core::demangle(typeid(typename index_type::value_type).name());
+        }
+
         /**
          * Construct a new element in the multi_index_container.
          * Set the ID to the next available ID, then increment _next_id and fire off on_create().
@@ -735,6 +739,10 @@ namespace chainbase {
 
         virtual void remove_object(int64_t id) = 0;
 
+        virtual std::string name() = 0;
+
+        virtual std::size_t size() = 0;
+
         void* get() const {
             return _idx_ptr;
         }
@@ -786,6 +794,14 @@ namespace chainbase {
             return _base.remove_object(id);
         }
 
+        virtual std::string name() override final {
+            return _base.name();
+        }
+
+        virtual std::size_t size() override final {
+            return _base.indicies().size();
+        }
+
     private:
         BaseIndex& _base;
     };
@@ -819,6 +835,8 @@ namespace chainbase {
         };
 
     public:
+        using index_list_type = std::vector<abstract_index*>;
+
         enum open_flags {
             read_only = 0, read_write = 1
         };
@@ -947,6 +965,18 @@ namespace chainbase {
 
         size_t free_memory() const {
             return _segment->get_segment_manager()->get_free_memory();
+        }
+
+        std::size_t index_list_size() const {
+            return _index_list.size();
+        }
+
+        index_list_type::const_iterator index_list_begin() const {
+            return _index_list.begin();
+        }
+
+        index_list_type::const_iterator index_list_end() const {
+            return _index_list.end();
         }
 
         template<typename MultiIndexType>
@@ -1205,7 +1235,7 @@ namespace chainbase {
         /**
          * This is a sparse list of known indicies kept to accelerate creation of undo sessions
          */
-        std::vector<abstract_index*> _index_list;
+        index_list_type _index_list;
 
         /**
          * This is a full map (size 2^16) of all possible index designed for constant time lookup
