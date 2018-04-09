@@ -103,6 +103,8 @@ namespace chainbase {
     void database::close() {
         _segment.reset();
         _data_dir = boost::filesystem::path();
+        _file_size = 0;
+        _reserved_size = 0;
     }
 
     void database::wipe(const boost::filesystem::path& dir) {
@@ -112,6 +114,8 @@ namespace chainbase {
         _index_list.clear();
         _index_map.clear();
         _index_types.clear();
+        _file_size = 0;
+        _reserved_size = 0;
     }
 
     void database::resize(size_t new_shared_file_size) {

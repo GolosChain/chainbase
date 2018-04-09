@@ -1199,6 +1199,14 @@ namespace chainbase {
             return _file_size;
         }
 
+        void reserved_memory(size_t value) {
+            _reserved_size = value;
+        }
+
+        size_t reserved_memory() const {
+            return _reserved_size;
+        }
+
     private:
         template<typename MultiIndexType>
         void add_index_helper() {
@@ -1258,6 +1266,7 @@ namespace chainbase {
 
         std::atomic<int32_t> _undo_session_count;
         size_t _file_size = 0;
+        size_t _reserved_size = 0;
     };
 
     template<typename Object, typename... Args>
