@@ -721,7 +721,7 @@ namespace chainbase {
         virtual ~abstract_index() {
         }
 
-        virtual void revision(uint64_t revision) = 0;
+        virtual void set_revision(uint64_t revision) = 0;
 
         virtual boost::interprocess::unique_ptr<abstract_session> start_undo_session() = 0;
 
@@ -762,7 +762,7 @@ namespace chainbase {
                     new session_impl<typename BaseIndex::session>(_base.start_undo_session()));
         }
 
-        virtual void revision(uint64_t revision) override {
+        virtual void set_revision(uint64_t revision) override {
             _base.revision(revision);
         }
 
@@ -851,7 +851,7 @@ namespace chainbase {
 
         void resize(size_t new_shared_file_size);
 
-        void require_locking(bool enable_require_locking);
+        void set_require_locking(bool enable_require_locking);
 
 #ifdef CHAINBASE_CHECK_LOCKING
 
@@ -928,13 +928,6 @@ namespace chainbase {
 
         session start_undo_session();
 
-        int64_t revision() const {
-            if (_index_list.size() == 0) {
-                return -1;
-            }
-            return _index_list[0]->revision();
-        }
-
         void undo();
 
         void squash();
@@ -943,40 +936,14 @@ namespace chainbase {
 
         void undo_all();
 
-        void revision(uint64_t revision) {
-            CHAINBASE_REQUIRE_WRITE_LOCK("revision", uint64_t);
-            for (auto i : _index_list) {
-                i->revision(revision);
-            }
-        }
+        int64_t revision() const;
 
+        void set_revision(uint64_t revision);
 
         template<typename MultiIndexType>
         void add_index() {
             _index_types.push_back(std::unique_ptr<abstract_index_type>(new index_type_impl<MultiIndexType>()));
             _index_types.back()->add_index(*this);
-        }
-
-        auto get_segment_manager() ->
-            decltype(((boost::interprocess::managed_mapped_file *)nullptr)->get_segment_manager())
-        {
-            return _segment->get_segment_manager();
-        }
-
-        size_t free_memory() const {
-            return _segment->get_segment_manager()->get_free_memory();
-        }
-
-        std::size_t index_list_size() const {
-            return _index_list.size();
-        }
-
-        index_list_type::const_iterator index_list_begin() const {
-            return _index_list.begin();
-        }
-
-        index_list_type::const_iterator index_list_end() const {
-            return _index_list.end();
         }
 
         template<typename MultiIndexType>
@@ -1183,21 +1150,30 @@ namespace chainbase {
             return with_write_lock(uint64_t(1000000), uint32_t(100000), std::forward<Lambda>(callback));
         }
 
-        void read_wait_micro(uint64_t value);
+        std::size_t index_list_size() const;
+
+        index_list_type::const_iterator index_list_begin() const;
+
+        index_list_type::const_iterator index_list_end() const;
+
+        auto segment_manager() -> decltype(((boost::interprocess::managed_mapped_file *)nullptr)->get_segment_manager());
+
+        void set_read_wait_micro(uint64_t value);
         uint64_t read_wait_micro() const;
 
-        void max_read_wait_retries(uint32_t value);
+        void set_max_read_wait_retries(uint32_t value);
         uint32_t max_read_wait_retries() const;
 
-        void write_wait_micro(uint64_t value);
+        void set_write_wait_micro(uint64_t value);
         uint64_t write_wait_micro() const;
 
-        void max_write_wait_retries(uint32_t value);
+        void set_max_write_wait_retries(uint32_t value);
         uint32_t max_write_wait_retries() const;
 
-        size_t max_memory() const {
-            return _file_size;
-        }
+        size_t max_memory() const;
+        size_t reserved_memory() const;
+        size_t free_memory() const;
+        void set_reserved_memory(size_t value);
 
     private:
         template<typename MultiIndexType>
@@ -1258,6 +1234,7 @@ namespace chainbase {
 
         std::atomic<int32_t> _undo_session_count;
         size_t _file_size = 0;
+        size_t _reserved_size = 0;
     };
 
     template<typename Object, typename... Args>

@@ -34,6 +34,9 @@ namespace chainbase {
     };
 
     void database::open(const boost::filesystem::path& dir, uint32_t flags, size_t shared_file_size) {
+        _read_lock_count.store(0);
+        _write_lock_count.store(0);
+        _undo_session_count.store(0);
 
         bool write = flags & database::read_write;
 
@@ -103,6 +106,11 @@ namespace chainbase {
     void database::close() {
         _segment.reset();
         _data_dir = boost::filesystem::path();
+        _file_size = 0;
+        _reserved_size = 0;
+        _read_lock_count.store(0);
+        _write_lock_count.store(0);
+        _undo_session_count.store(0);
     }
 
     void database::wipe(const boost::filesystem::path& dir) {
@@ -112,6 +120,11 @@ namespace chainbase {
         _index_list.clear();
         _index_map.clear();
         _index_types.clear();
+        _file_size = 0;
+        _reserved_size = 0;
+        _read_lock_count.store(0);
+        _write_lock_count.store(0);
+        _undo_session_count.store(0);
     }
 
     void database::resize(size_t new_shared_file_size) {
@@ -131,7 +144,7 @@ namespace chainbase {
         }
     }
 
-    void database::require_locking(bool enable_require_locking) {
+    void database::set_require_locking(bool enable_require_locking) {
 #ifdef CHAINBASE_CHECK_LOCKING
         _enable_require_locking = enable_require_locking;
 #endif
@@ -182,7 +195,43 @@ namespace chainbase {
         return session(std::move(sub_sessions), _undo_session_count);
     }
 
-    void database::read_wait_micro(uint64_t value) {
+    int64_t database::revision() const {
+        if (_index_list.size() == 0) {
+            return -1;
+        }
+        return _index_list[0]->revision();
+    }
+
+    void database::set_revision(uint64_t revision) {
+        CHAINBASE_REQUIRE_WRITE_LOCK("revision", uint64_t);
+        for (auto i : _index_list) {
+            i->set_revision(revision);
+        }
+    }
+
+    std::size_t database::index_list_size() const {
+        return _index_list.size();
+    }
+
+    auto database::index_list_begin() const -> index_list_type::const_iterator {
+        return _index_list.begin();
+    }
+
+    auto database::index_list_end() const -> index_list_type::const_iterator {
+        return _index_list.end();
+    }
+
+    auto database::segment_manager()
+        -> decltype(((boost::interprocess::managed_mapped_file *)nullptr)->get_segment_manager())
+    {
+        return _segment->get_segment_manager();
+    }
+
+    size_t database::free_memory() const {
+        return _segment->get_segment_manager()->get_free_memory();
+    }
+
+    void database::set_read_wait_micro(uint64_t value) {
         _read_wait_micro = value;
     }
 
@@ -190,7 +239,7 @@ namespace chainbase {
         return _read_wait_micro;
     }
 
-    void database::max_read_wait_retries(uint32_t value) {
+    void database::set_max_read_wait_retries(uint32_t value) {
         _max_read_wait_retries = value;
     }
 
@@ -198,7 +247,7 @@ namespace chainbase {
         return _max_read_wait_retries;
     };
 
-    void database::write_wait_micro(uint64_t value) {
+    void database::set_write_wait_micro(uint64_t value) {
         _write_wait_micro = value;
     }
 
@@ -206,12 +255,24 @@ namespace chainbase {
         return _write_wait_micro;
     }
 
-    void database::max_write_wait_retries(uint32_t value) {
+    void database::set_max_write_wait_retries(uint32_t value) {
         _max_write_wait_retries = value;
     }
 
     uint32_t database::max_write_wait_retries() const {
         return _max_write_wait_retries;
+    }
+
+    size_t database::max_memory() const {
+        return _file_size;
+    }
+
+    void database::set_reserved_memory(size_t value) {
+        _reserved_size = value;
+    }
+
+    size_t database::reserved_memory() const {
+        return _reserved_size;
     }
 
 }  // namespace chainbase
